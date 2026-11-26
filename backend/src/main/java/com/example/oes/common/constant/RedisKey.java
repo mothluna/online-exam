@@ -28,4 +28,18 @@ public final class RedisKey {
     public static String loginFail(String username) {
         return LOGIN_FAIL.formatted(username);
     }
+
+    /** 开考并发前置拦截，10 秒自动过期 */
+    private static final String EXAM_START_LOCK = "oes:start:%s:%s";
+
+    /** 答卷截止时间快查，避免每次暂存/提交都读库 */
+    private static final String ATTEMPT_DEADLINE = "oes:deadline:%s";
+
+    public static String examStartLock(Long examId, Long userId) {
+        return EXAM_START_LOCK.formatted(examId, userId);
+    }
+
+    public static String attemptDeadline(Long attemptId) {
+        return ATTEMPT_DEADLINE.formatted(attemptId);
+    }
 }

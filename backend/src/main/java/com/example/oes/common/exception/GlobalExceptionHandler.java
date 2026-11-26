@@ -25,14 +25,16 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
-    public ResponseEntity<R<Void>> handleBiz(BizException e) {
+    public ResponseEntity<R<Object>> handleBiz(BizException e) {
         ResultCode rc = e.getResultCode();
         log.warn("biz error: code={}, msg={}", rc.getCode(), e.getMessage());
-        return ResponseEntity.status(rc.getHttpStatus()).body(R.fail(rc, e.getMessage()));
+        R<Object> body = R.fail(rc, e.getMessage());
+        body.setData(e.getData());
+        return ResponseEntity.status(rc.getHttpStatus()).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<R<Void>> handleInvalid(MethodArgumentNotValidException e) {
+    public ResponseEntity<R<Object>> handleInvalid(MethodArgumentNotValidException e) {
         String detail = e.getBindingResult().getFieldErrors().stream()
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
@@ -42,7 +44,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<R<Void>> handleConstraint(ConstraintViolationException e) {
+    public ResponseEntity<R<Object>> handleConstraint(ConstraintViolationException e) {
         String detail = e.getConstraintViolations().stream()
                 .map(ConstraintViolation::getMessage)
                 .collect(Collectors.joining("; "));
@@ -54,7 +56,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MissingServletRequestParameterException.class,
             MethodArgumentTypeMismatchException.class,
             HttpMessageNotReadableException.class})
-    public ResponseEntity<R<Void>> handleBadRequest(Exception e) {
+    public ResponseEntity<R<Object>> handleBadRequest(Exception e) {
         log.warn("bad request: {}", e.getMessage());
         return ResponseEntity.status(ResultCode.PARAM_INVALID.getHttpStatus())
                 .body(R.fail(ResultCode.PARAM_INVALID, "请求参数格式不正确"));
@@ -66,7 +68,7 @@ public class GlobalExceptionHandler {
      * 走到这里的是未归因的兜底情况。
      */
     @ExceptionHandler(DuplicateKeyException.class)
-    public ResponseEntity<R<Void>> handleDuplicateKey(DuplicateKeyException e) {
+    public ResponseEntity<R<Object>> handleDuplicateKey(DuplicateKeyException e) {
         log.warn("duplicate key: {}", e.getMessage());
         return ResponseEntity.status(ResultCode.DUPLICATE_STEM.getHttpStatus())
                 .body(R.fail(ResultCode.DUPLICATE_STEM, "数据已存在，请勿重复提交"));
@@ -78,14 +80,14 @@ public class GlobalExceptionHandler {
      * 若不单独处理会被下面的 Exception 兜底成 500 —— 必须在这里拦住。
      */
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<R<Void>> handleNotFound(NoResourceFoundException e) {
+    public ResponseEntity<R<Object>> handleNotFound(NoResourceFoundException e) {
         log.warn("no handler for: {} {}", e.getHttpMethod(), e.getResourcePath());
         return ResponseEntity.status(ResultCode.NOT_FOUND.getHttpStatus())
                 .body(R.fail(ResultCode.NOT_FOUND, "接口不存在: " + e.getResourcePath()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<R<Void>> handleOther(Exception e) {
+    public ResponseEntity<R<Object>> handleOther(Exception e) {
         log.error("unexpected error", e);
         return ResponseEntity.status(ResultCode.SYSTEM_ERROR.getHttpStatus())
                 .body(R.fail(ResultCode.SYSTEM_ERROR));
