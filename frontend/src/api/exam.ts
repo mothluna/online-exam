@@ -41,6 +41,10 @@ export interface StudentExamItem {
   totalCount: number
   state: ExamState
   attemptId?: number
+  /** 本人得分；未交卷时为 null */
+  score?: number | null
+  /** 是否及格；未交卷时为 null */
+  isPass?: number | null
 }
 
 export interface AttemptQuestion {
@@ -72,6 +76,40 @@ export interface Attempt {
   totalCount: number
   questions: AttemptQuestion[]
   answers: AttemptAnswer[]
+}
+
+export interface QuestionResult {
+  questionId: number
+  sortNo: number
+  type: QuestionType
+  typeLabel: string
+  stem: string
+  options: { key: string; content: string }[]
+  myAnswer: string[]
+  /** 考试结束前不下发 */
+  correctAnswer?: string[] | null
+  /** 考试结束前为 null：逐题得分会反推答案（判断题得 0 分即公布答案） */
+  score: number | null
+  fullScore: number
+  judgeType: string
+  fullMark?: boolean | null
+}
+
+export interface AttemptResult {
+  attemptId: number
+  examId: number
+  examTitle: string
+  status: AttemptStatus
+  submitTime: string
+  totalScore: number
+  objectiveScore: number
+  subjectiveScore: number
+  passScore: number
+  isPass: number
+  needReview: boolean
+  answerVisible: boolean
+  answerReleaseTime?: string
+  questions: QuestionResult[]
 }
 
 export interface SubmitResult {
@@ -129,4 +167,8 @@ export function saveAnswers(attemptId: number, items: { questionId: number; answ
 
 export function submitAttempt(attemptId: number) {
   return post<SubmitResult>(`/student/attempts/${attemptId}/submit`)
+}
+
+export function fetchAttemptResult(attemptId: number) {
+  return get<AttemptResult>(`/student/attempts/${attemptId}/result`)
 }

@@ -29,4 +29,10 @@ public class StudentExamVO {
 
     /** 已有答卷时回带，前端可直接续考 */
     private Long attemptId;
+
+    /** 本人得分（0.01 分为单位的整数在前端换算）；未交卷时为 null */
+    private BigDecimal score;
+
+    /** 是否及格；未交卷时为 null */
+    private Integer isPass;
 }

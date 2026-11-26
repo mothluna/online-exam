@@ -95,6 +95,14 @@ onMounted(load)
             <div class="row"><span class="label">时长</span>{{ formatDuration(exam.durationSec) }}</div>
             <div class="row"><span class="label">开放</span>{{ exam.startTime }}</div>
             <div class="row"><span class="label">截止</span>{{ exam.endTime }}</div>
+            <div v-if="exam.state === 'SUBMITTED' && exam.score != null" class="row score-row">
+              <span class="label">得分</span>
+              <span class="score">{{ Number(exam.score).toFixed(2) }}</span>
+              <span class="score-total">/ {{ Number(exam.totalScore).toFixed(2) }} 分</span>
+              <el-tag size="small" :type="exam.isPass === 1 ? 'success' : 'danger'" effect="plain">
+                {{ exam.isPass === 1 ? '已通过' : '未通过' }}
+              </el-tag>
+            </div>
           </div>
 
           <div class="actions">
@@ -108,6 +116,14 @@ onMounted(load)
             </el-button>
             <el-button v-else-if="exam.state === 'IN_PROGRESS'" type="warning" @click="enter(exam)">
               继续作答
+            </el-button>
+            <el-button
+              v-else-if="exam.state === 'SUBMITTED' && exam.attemptId"
+              type="primary"
+              plain
+              @click="router.push(`/exam-result/${exam.attemptId}`)"
+            >
+              查看成绩
             </el-button>
             <el-button v-else disabled>已结束</el-button>
           </div>
@@ -157,6 +173,23 @@ onMounted(load)
 .row .label {
   display: inline-block;
   width: 44px;
+  color: var(--el-text-color-secondary);
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--el-color-primary);
+  line-height: 1.2;
+}
+
+.score-total {
   color: var(--el-text-color-secondary);
 }
 

@@ -1,6 +1,7 @@
 package com.example.oes.service;
 
 import com.example.oes.dto.AnswerSaveRequest;
+import com.example.oes.vo.AttemptResultVO;
 import com.example.oes.vo.AttemptVO;
 import com.example.oes.vo.StudentExamVO;
 import com.example.oes.vo.SubmitResultVO;
@@ -23,4 +24,10 @@ public interface ExamTakingService {
 
     /** 交卷。幂等：重复提交返回同一结果，不重复判分 */
     SubmitResultVO submit(Long attemptId, Long userId);
+
+    /**
+     * 成绩单。正确答案在考试结束时间之前不下发，
+     * 防止先交卷的考生把答案传给同场次还没考的人。
+     */
+    AttemptResultVO result(Long attemptId, Long userId);
 }

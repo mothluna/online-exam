@@ -22,6 +22,7 @@ import com.example.oes.mapper.PaperQuestionMapper;
 import com.example.oes.mapper.QuestionMapper;
 import com.example.oes.service.ExamTakingService;
 import com.example.oes.service.JudgeService;
+import com.example.oes.vo.AttemptResultVO;
 import com.example.oes.vo.AttemptVO;
 import com.example.oes.vo.StudentExamVO;
 import com.example.oes.vo.SubmitResultVO;
@@ -99,6 +100,8 @@ public class ExamTakingServiceImpl implements ExamTakingService {
         for (Exam exam : exams) {
             Paper paper = paperMap.get(exam.getPaperId());
             ExamAttempt attempt = attemptMap.get(exam.getId());
+            // 只有已交卷的答卷才有得分：IN_PROGRESS 时 total_score 恒为 0，回给前端会被误读成"考了 0 分"
+            boolean submitted = attempt != null && !IN_PROGRESS.equals(attempt.getStatus());
             result.add(StudentExamVO.builder()
                     .id(exam.getId())
                     .title(exam.getTitle())
@@ -109,6 +112,8 @@ public class ExamTakingServiceImpl implements ExamTakingService {
                     .totalCount(paper == null ? null : paper.getTotalCount())
                     .state(resolveState(exam, attempt, now))
                     .attemptId(attempt == null ? null : attempt.getId())
+                    .score(submitted ? ScoreUtil.toYuan(attempt.getTotalScore() == null ? 0 : attempt.getTotalScore()) : null)
+                    .isPass(submitted ? attempt.getIsPass() : null)
                     .build());
         }
         return result;
@@ -258,6 +263,80 @@ public class ExamTakingServiceImpl implements ExamTakingService {
         log.info("attempt submitted: id={}, status={}, expired={}, total={}",
                 attemptId, target, expired, latest.getTotalScore());
         return toResult(latest, gradeResult);
+    }
+
+    @Override
+    public AttemptResultVO result(Long attemptId, Long userId) {
+        ExamAttempt attempt = loadOwnedAttempt(attemptId, userId);
+        if (IN_PROGRESS.equals(attempt.getStatus())) {
+            throw new BizException(ResultCode.PARAM_INVALID, "尚未交卷，暂无成绩");
+        }
+
+        Exam exam = examMapper.selectById(attempt.getExamId());
+        Paper paper = paperMapper.selectById(attempt.getPaperId());
+        LocalDateTime now = LocalDateTime.now();
+        // 考试结束前只给总分：正确答案、逐题得分与对错都不下发
+        boolean released = exam != null && exam.getEndTime() != null && !now.isBefore(exam.getEndTime());
+
+        List<AttemptAnswer> answers = answerMapper.selectByAttempt(attemptId);
+        Map<Long, Question> questionMap = answers.isEmpty() ? Map.of()
+                : questionMapper.selectBatchIds(answers.stream().map(AttemptAnswer::getQuestionId).toList())
+                .stream().collect(Collectors.toMap(Question::getId, q -> q));
+        Map<Long, Integer> fullScoreMap = paperQuestionMapper.selectList(
+                        Wrappers.<PaperQuestion>lambdaQuery()
+                                .eq(PaperQuestion::getPaperId, attempt.getPaperId()))
+                .stream().collect(Collectors.toMap(PaperQuestion::getQuestionId, PaperQuestion::getScore));
+
+        boolean needReview = false;
+        List<AttemptResultVO.QuestionResult> items = new ArrayList<>(answers.size());
+        for (AttemptAnswer answer : answers) {
+            Question q = questionMap.get(answer.getQuestionId());
+            if (q == null) {
+                continue;
+            }
+            int full = fullScoreMap.getOrDefault(q.getId(), 0);
+            int got = answer.getScore() == null ? 0 : answer.getScore();
+            boolean subjective = "SHORT".equals(q.getType());
+            needReview = needReview || subjective;
+
+            items.add(AttemptResultVO.QuestionResult.builder()
+                    .questionId(q.getId())
+                    .sortNo(answer.getSortNo())
+                    .type(q.getType())
+                    .typeLabel(QuestionType.valueOf(q.getType()).label())
+                    .stem(q.getStem())
+                    .options(parseOptions(q.getOptionsJson()).stream()
+                            .map(o -> AttemptResultVO.Option.builder()
+                                    .key(o.getKey())
+                                    .content(o.getContent())
+                                    .build())
+                            .toList())
+                    .myAnswer(parseAnswer(answer.getAnswerJson()))
+                    .correctAnswer(released ? parseAnswer(q.getAnswerJson()) : null)
+                    // 逐题得分同样属于答案信息：判断题答"对"得 0 分，等于直接公布答案是"错"
+                    .score(released ? ScoreUtil.toYuan(got) : null)
+                    .fullScore(ScoreUtil.toYuan(full))
+                    .judgeType(answer.getJudgeType())
+                    .fullMark(released && !subjective ? got >= full && full > 0 : null)
+                    .build());
+        }
+
+        return AttemptResultVO.builder()
+                .attemptId(attempt.getId())
+                .examId(attempt.getExamId())
+                .examTitle(exam == null ? null : exam.getTitle())
+                .status(attempt.getStatus())
+                .submitTime(attempt.getSubmitTime())
+                .totalScore(ScoreUtil.toYuan(attempt.getTotalScore() == null ? 0 : attempt.getTotalScore()))
+                .objectiveScore(ScoreUtil.toYuan(attempt.getObjectiveScore() == null ? 0 : attempt.getObjectiveScore()))
+                .subjectiveScore(ScoreUtil.toYuan(attempt.getSubjectiveScore() == null ? 0 : attempt.getSubjectiveScore()))
+                .passScore(ScoreUtil.toYuan(paper == null || paper.getPassScore() == null ? 0 : paper.getPassScore()))
+                .isPass(attempt.getIsPass())
+                .needReview(needReview)
+                .answerVisible(released)
+                .answerReleaseTime(exam == null ? null : exam.getEndTime())
+                .questions(items)
+                .build();
     }
 
     // ---------------- 内部方法 ----------------

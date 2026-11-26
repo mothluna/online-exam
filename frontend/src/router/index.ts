@@ -67,6 +67,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/student/MyExamListView.vue'),
         meta: { title: '我的考试', roles: ['STUDENT'] },
       },
+      {
+        path: 'exam-result/:attemptId',
+        name: 'exam-result',
+        component: () => import('@/views/student/AttemptResultView.vue'),
+        meta: { title: '成绩详情', roles: ['STUDENT'] },
+      },
     ],
   },
   {

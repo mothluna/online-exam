@@ -5,6 +5,7 @@ import com.example.oes.dto.AnswerSaveRequest;
 import com.example.oes.security.RequireRole;
 import com.example.oes.security.UserContext;
 import com.example.oes.service.ExamTakingService;
+import com.example.oes.vo.AttemptResultVO;
 import com.example.oes.vo.AttemptVO;
 import com.example.oes.vo.StudentExamVO;
 import com.example.oes.vo.SubmitResultVO;
@@ -55,6 +56,12 @@ public class StudentExamController {
                                @Valid @RequestBody AnswerSaveRequest request) {
         examTakingService.saveAnswers(attemptId, UserContext.userId(), request);
         return R.ok();
+    }
+
+    @Operation(summary = "成绩单（考试结束前不返回答案）")
+    @GetMapping("/attempts/{attemptId}/result")
+    public R<AttemptResultVO> result(@PathVariable Long attemptId) {
+        return R.ok(examTakingService.result(attemptId, UserContext.userId()));
     }
 
     @Operation(summary = "交卷（幂等，超时提交标记 TIMEOUT）")

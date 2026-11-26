@@ -402,7 +402,8 @@ onBeforeUnmount(() => {
         </el-result>
       </div>
       <template #footer>
-        <el-button type="primary" @click="backToList">返回考试列表</el-button>
+        <el-button @click="backToList">返回考试列表</el-button>
+        <el-button type="primary" @click="router.replace(`/exam-result/${attemptId}`)">查看成绩</el-button>
       </template>
     </el-dialog>
   </div>
