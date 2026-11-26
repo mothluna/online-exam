@@ -3,6 +3,9 @@
 -- 分数用确定性表达式生成（而非 RAND），保证 objective_score 与 total_score 一致且可复现
 -- 注意：仅在开发库执行，勿在生产运行
 
+-- 必须声明连接字符集：mysql 客户端默认 latin1，中文会被双重编码成乱码
+SET NAMES utf8mb4;
+
 SET SESSION cte_max_recursion_depth = 5000;
 
 -- 1. 1000 个考生账号，密码与 student 相同（123456），便于直接登录验证
@@ -16,7 +19,7 @@ SELECT 10000 + n,
 FROM seq;
 
 -- 2. exam 1 造 1000 份答卷：总分 0~99.99，60 分及以上及格
-INSERT INTO exam_attempt (exam_id, user_id, paper_id, seq_no, status, start_time, deadline,
+INSERT IGNORE INTO exam_attempt (exam_id, user_id, paper_id, seq_no, status, start_time, deadline,
                           submit_time, objective_score, subjective_score, total_score, is_pass, version, created_at)
 WITH RECURSIVE seq AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM seq WHERE n < 1000)
 SELECT 1, 10000 + n, 1, 1, 'GRADED',
@@ -35,7 +38,7 @@ SELECT 1, CONCAT('压测考试 ', n), NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 1
 FROM seq;
 
 -- 4. 每场 50 份答卷，共 900 份
-INSERT INTO exam_attempt (exam_id, user_id, paper_id, seq_no, status, start_time, deadline,
+INSERT IGNORE INTO exam_attempt (exam_id, user_id, paper_id, seq_no, status, start_time, deadline,
                           submit_time, objective_score, subjective_score, total_score, is_pass, version, created_at)
 WITH RECURSIVE exam_seq AS (SELECT 4 AS e UNION ALL SELECT e + 1 FROM exam_seq WHERE e < 21),
                user_seq AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM user_seq WHERE n < 50)

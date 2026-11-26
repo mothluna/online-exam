@@ -1,5 +1,6 @@
 package com.example.oes.mapper;
 
+import com.example.oes.dto.AttemptExportRow;
 import com.example.oes.vo.AttemptStatVO;
 import com.example.oes.vo.ExamStatVO;
 import org.apache.ibatis.annotations.Mapper;
@@ -73,7 +74,7 @@ public interface StatMapper {
     @Select("""
             SELECT a.id AS attemptId,
                    a.user_id AS userId,
-                   u.real_name AS userName,
+                   u.real_name AS realName,
                    a.status AS status,
                    a.total_score / 100 AS totalScore,
                    a.is_pass AS isPass,
@@ -88,4 +89,32 @@ public interface StatMapper {
     List<AttemptStatVO> pageAttempts(@Param("examId") Long examId,
                                      @Param("offset") long offset,
                                      @Param("size") long size);
+
+    /**
+     * 导出取数。与明细分页同样的排序与口径，状态与及格在 SQL 里就转成中文，
+     * 避免导出文件里出现 GRADED 这种内部枚举值。
+     */
+    @Select("""
+            SELECT a.id AS attemptId,
+                   u.username AS username,
+                   u.real_name AS realName,
+                   CASE a.status
+                       WHEN 'GRADED' THEN '已判分'
+                       WHEN 'SUBMITTED' THEN '已交卷'
+                       WHEN 'TIMEOUT' THEN '超时交卷'
+                       ELSE '进行中'
+                   END AS statusText,
+                   a.total_score / 100 AS totalScore,
+                   IF(a.is_pass = 1, '及格', '不及格') AS passText,
+                   a.submit_time AS submitTime,
+                   TIMESTAMPDIFF(SECOND, a.start_time, COALESCE(a.submit_time, a.deadline)) AS durationSec
+            FROM exam_attempt a
+            LEFT JOIN sys_user u ON u.id = a.user_id
+            WHERE a.exam_id = #{examId}
+            ORDER BY a.total_score DESC, a.id
+            LIMIT #{offset}, #{size}
+            """)
+    List<AttemptExportRow> exportRows(@Param("examId") Long examId,
+                                      @Param("offset") long offset,
+                                      @Param("size") long size);
 }
