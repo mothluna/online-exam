@@ -7,8 +7,17 @@
 ```bash
 cd deploy
 cp .env.example .env      # 首次
-docker compose up -d
+docker compose up -d      # 只起中间件（本地开发）
 ```
+
+一键部署应用层（api + web + 中间件）：
+
+```bash
+docker compose --profile app up -d --build
+# 入口 http://localhost:8081，后端 8080
+```
+
+完整部署、备份与上线检查见 `docs/05-部署手册.md`。
 
 自检（Windows PowerShell）：
 

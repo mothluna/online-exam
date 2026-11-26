@@ -61,6 +61,51 @@ services:
     volumes:
       - minio-data:/data
 
+  # ---------- 应用层：默认不启动，生产/演示用 --profile app 拉起 ----------
+  # 开发时只起中间件：docker compose up -d
+  # 全量部署：docker compose --profile app up -d --build
+  api:
+    profiles: ["app"]
+    build:
+      context: ../backend
+    container_name: oes-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: oes
+      MYSQL_PASSWORD: oes123456
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123456}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minio123456}
+      MINIO_BUCKET: oes-file
+      # 生产部署务必通过 .env 覆盖，HS256 要求至少 32 字节
+      JWT_SECRET: ${JWT_SECRET:-oes-dev-secret-key-please-change-in-production-0123456789}
+    ports:
+      - "8080:8080"
+
+  web:
+    profiles: ["app"]
+    build:
+      context: ../frontend
+    container_name: oes-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # 80 端口常被占用，这里用 8081；如需 80 直接改左侧端口
+      - "8081:80"
+
 volumes:
   mysql-data:
   redis-data:

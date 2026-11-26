@@ -149,7 +149,15 @@ curl.exe -s -X POST http://localhost:8080/api/auth/login ^
 
 ---
 
-## 四、已知限制
+## 四、部署
+
+- **本机开发**：中间件 `cd deploy && docker compose up -d`，后端 `mvn spring-boot:run`，前端 `npm run dev`。
+- **一键部署**：`cd deploy && docker compose --profile app up -d --build`（api + web + 中间件），入口 `http://localhost:8081`。
+- 生产配置、备份、升级、安全清单见 [`docs/05-部署手册.md`](docs/05-部署手册.md)。
+
+---
+
+## 五、已知限制
 
 - **主观题自动评分只做粗筛**：简答题按关键词命中给分并标记待复核，最终成绩以教师复核为准；复核入口在「记录统计 → 成绩明细 → 复核」。
 - **暂存不校验答案取值**：如判断题传 `"B"` 会被原样存下、判 0 分（考试链路优先「不阻断考生」）。
@@ -162,7 +170,7 @@ curl.exe -s -X POST http://localhost:8080/api/auth/login ^
 
 ---
 
-## 五、常见问题
+## 六、常见问题
 
 **端口 8080 被占用 / 启动报 `Port already in use`**
 
