@@ -70,6 +70,13 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    // 作答页单独成路由、不套主框架：考试期间不应该有侧边栏可以点走
+    path: '/exam/:attemptId',
+    name: 'take-exam',
+    component: () => import('@/views/student/TakeExamView.vue'),
+    meta: { title: '考试中', roles: ['STUDENT'] },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/views/error/ForbiddenView.vue'),
