@@ -174,9 +174,11 @@ public class JudgeServiceImpl implements JudgeService {
     }
 
     private boolean hasShortAnswer(ExamAttempt attempt) {
-        // 已判分时以明细判断是否含主观题
+        // 以 judge_type 判断：判分后客观题为 AUTO、简答题为 UNJUDGED；
+        // 教师复核后简答题变 MANUAL，这里也随之不再要求复核。
+        // 不能依赖 judge_detail 里的标记——它会被复核时的"教师复核"文案覆盖。
         return answerMapper.selectByAttempt(attempt.getId()).stream()
-                .anyMatch(a -> a.getJudgeDetail() != null && a.getJudgeDetail().contains(NEED_REVIEW_MARK));
+                .anyMatch(a -> "UNJUDGED".equals(a.getJudgeType()));
     }
 
     private List<String> parseStringList(String json) {

@@ -13,6 +13,7 @@ import {
 } from '@/api/stat'
 import { saveBlob } from '@/utils/download'
 import ScoreDistChart from './components/ScoreDistChart.vue'
+import AttemptReviewDrawer from './components/AttemptReviewDrawer.vue'
 
 const list = ref<ExamStat[]>([])
 const total = ref(0)
@@ -34,6 +35,8 @@ const attemptSize = 10
 const detailLoading = ref(false)
 const exporting = ref(false)
 const exportTip = ref('')
+const reviewAttemptId = ref<number | null>(null)
+const reviewVisible = ref(false)
 
 const statusText: Record<string, string> = {
   GRADED: '已判分',
@@ -116,6 +119,16 @@ async function loadAttempts(page: number) {
   } finally {
     detailLoading.value = false
   }
+}
+
+function openReview(row: AttemptStat) {
+  reviewAttemptId.value = row.attemptId
+  reviewVisible.value = true
+}
+
+async function onReviewed() {
+  // 复核改的是总分与及格状态，刷当前页即可（排序会因此变化，翻页时自然归位）
+  await loadAttempts(attemptPage.value)
 }
 
 function sleep(ms: number) {
@@ -305,6 +318,11 @@ onMounted(loadList)
       <el-table-column label="用时" width="100">
         <template #default="{ row }">{{ Math.round((row.durationSec ?? 0) / 60) }} 分钟</template>
       </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button text type="primary" size="small" @click="openReview(row)">复核</el-button>
+        </template>
+      </el-table-column>
       <template #empty>暂无数据</template>
     </el-table>
 
@@ -318,6 +336,8 @@ onMounted(loadList)
       />
     </div>
   </el-card>
+
+  <AttemptReviewDrawer v-model="reviewVisible" :attempt-id="reviewAttemptId" @reviewed="onReviewed" />
 </template>
 
 <style scoped>

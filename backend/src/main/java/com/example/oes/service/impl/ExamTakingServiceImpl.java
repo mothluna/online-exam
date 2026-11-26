@@ -297,7 +297,9 @@ public class ExamTakingServiceImpl implements ExamTakingService {
             int full = fullScoreMap.getOrDefault(q.getId(), 0);
             int got = answer.getScore() == null ? 0 : answer.getScore();
             boolean subjective = "SHORT".equals(q.getType());
-            needReview = needReview || subjective;
+            // 按明细判定"还有没有待复核的主观题"：教师复核后 judge_type 变为 MANUAL，
+            // 若仍按题型判断，复核完的成绩页会一直提示"待复核"
+            needReview = needReview || "UNJUDGED".equals(answer.getJudgeType());
 
             items.add(AttemptResultVO.QuestionResult.builder()
                     .questionId(q.getId())

@@ -11,6 +11,9 @@ import {
 } from '@/api/user'
 import UserFormDialog from './components/UserFormDialog.vue'
 import ResetPasswordDialog from './components/ResetPasswordDialog.vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const list = ref<UserItem[]>([])
 const total = ref(0)
@@ -38,6 +41,11 @@ function roleTagType(role: string) {
     default:
       return 'info'
   }
+}
+
+/** 停用/删除/强制下线自己会被后端拒绝，前端直接禁用，省一次无效点击 */
+function isSelf(row: UserItem) {
+  return row.id === userStore.user?.id
 }
 
 async function loadList() {
@@ -181,6 +189,7 @@ onMounted(loadList)
             v-model="row.status"
             :active-value="1"
             :inactive-value="0"
+            :disabled="isSelf(row)"
             @change="toggleStatus(row)"
           />
         </template>
@@ -193,8 +202,8 @@ onMounted(loadList)
         <template #default="{ row }">
           <el-button text type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-button text type="primary" size="small" @click="openResetPassword(row)">重置密码</el-button>
-          <el-button text type="warning" size="small" @click="kick(row)">强制下线</el-button>
-          <el-button text type="danger" size="small" @click="remove(row)">删除</el-button>
+          <el-button text type="warning" size="small" :disabled="isSelf(row)" @click="kick(row)">强制下线</el-button>
+          <el-button text type="danger" size="small" :disabled="isSelf(row)" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
