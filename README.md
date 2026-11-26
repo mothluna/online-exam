@@ -1,16 +1,39 @@
 # 在线考试系统（OES）
 
-Java 17 + Spring Boot 3.2 + MyBatis-Plus + MySQL 8 + Redis + S3 兼容对象存储；前端 Vue 3（待建）。
+面向学校/培训机构的小型在线考试系统，覆盖「建题库 → 组卷 → 组织考试 → 作答 → 自动判卷 → 成绩统计」闭环。
+
+后端 Java 17 + Spring Boot 3.2 + MyBatis-Plus + MySQL 8 + Redis + S3 兼容对象存储（RustFS，MinIO SDK 直连）；
+前端 Vue 3 + Element Plus + Vite + Pinia + Vue Router。
 
 ```
-docs/      需求分析与方案设计、环境检查报告、开发日志
+docs/      需求分析与方案设计、环境检查报告、开发日志（含决策记录与问题清单）
 backend/   Spring Boot 后端（单模块，按 controller/service/mapper 分包）
-deploy/    docker-compose 与初始化 SQL、环境自检脚本
+frontend/  Vue 3 前端（教师端 5 页 + 学生端 3 页）
+deploy/    docker-compose、初始化 SQL、环境自检脚本
 ```
 
 ---
 
-## 一、本地运行
+## 一、当前进度
+
+| 模块 | 后端 | 前端 | 说明 |
+|---|---|---|---|
+| 认证鉴权 | ✅ | ✅ | JWT + Redis 白名单 + 版本号；401/403 流水线；登录 5 次锁定 |
+| 用户管理 | ✅ | ✅ | 增删改查、重置密码、启停、强制下线；三条自保护 |
+| 题库与分类 | ✅ | ✅ | 五类题型、三级分类树、题干归一化去重 |
+| Excel 批量导入 | ✅ | ✅ | 1000 行约 0.7s，失败明细回传 |
+| 试卷与组卷 | ✅ | ✅ | 手工/按比例随机、抽题不重复、总分零偏差、发布前事实校验 |
+| 考试与作答 | ✅ | ✅ | 防重复开考、批量暂存幂等、服务端计时、超时自动交卷 |
+| 自动判卷 | ✅ | — | 客观题自动判分（整数分值），主观题关键词粗筛 |
+| 成绩统计与导出 | ✅ | ✅ | 固定 3 条 SQL、分数分布、同步/异步导出 |
+| 学生成绩查看 | ✅ | ✅ | 列表直接显示得分，逐题回顾；考试结束前锁定答案 |
+| 主观题人工复核 | ❌ | ❌ | 当前只标记 `needReview`，复核接口待补 |
+
+细节与取舍见 `docs/02-开发日志.md`；需求与设计见 `docs/01-需求分析与方案设计.md`。
+
+---
+
+## 二、本地运行
 
 ### 0. 前置条件
 
@@ -18,7 +41,7 @@ deploy/    docker-compose 与初始化 SQL、环境自检脚本
 |---|---|---|
 | JDK | 17 | `D:\develop\jdk\current` 已指向 `jdk-17.0.2` |
 | Docker Desktop | 运行中 | 需手动启动（引擎依赖 wsl.exe） |
-| 中间件 | MySQL/Redis/对象存储 | 见下方命令 |
+| 中间件 | MySQL / Redis / 对象存储 | 见下方命令 |
 
 ```bash
 cd deploy
@@ -73,24 +96,31 @@ npm run dev          # http://localhost:5173
 生产构建（Windows 需要把临时目录指到项目内，见常见问题）：
 
 ```bash
-TMP=E:/workspace/online-exam/frontend/.tmp TEMP=... npm run build
+cd frontend
+mkdir -p .tmp
+TMP=$PWD/.tmp TEMP=$PWD/.tmp npm run build
 ```
-
 
 ---
 
-## 二、验证清单
+## 三、验证清单
 
-启动后按顺序执行，全部通过说明环境与代码都正常。
+启动后端与前端后按顺序执行，全部通过说明环境与代码都正常。
 
 | # | 操作 | 期望 |
 |---|---|---|
-| 1 | 打开 http://localhost:8080/doc.html | Knife4j 文档页，显示 5 个接口 |
-| 2 | `GET /api/ping` | `200`，`{"code":0,...,"java":"17.0.2"}` |
-| 3 | `POST /api/auth/login` | `200`，返回 token 与角色 |
-| 4 | `GET /api/auth/me`（带 token） | `200`，返回当前用户 |
-| 5 | `GET /api/admin/ping`（学生 token） | **403** |
-| 6 | `POST /api/auth/logout` 后复用 token | **401 / 40102** |
+| 1 | `GET http://localhost:8080/api/ping` | `200`，`{"code":0,...,"java":"17.0.2"}` |
+| 2 | 打开 http://localhost:8080/doc.html | Knife4j 文档页，按 `01-认证` ~ `06-考试作答` 等分组列出全部接口 |
+| 3 | `POST /api/auth/login`（student / 123456） | `200`，返回 token、角色与用户信息 |
+| 4 | `GET /api/auth/me`（带 token） | `200` |
+| 5 | `GET /api/admin/questions`（学生 token） | **403 / 40300** |
+| 6 | `POST /api/auth/logout` 后复用旧 token | **401 / 40102** |
+| 7 | 教师：`POST /api/admin/questions/import` | `200`，返回 success / failed 与失败明细 |
+| 8 | 教师：创建试卷 → `POST /api/admin/papers/{id}/randomize` | `200`，抽题数与总分等于规则合计 |
+| 9 | 学生：`POST /api/student/exams/{id}/start` → 暂存 → `submit` | `200`，返回得分与是否及格 |
+| 10 | 学生：`GET /api/student/attempts/{id}/result` | 总分可见；考试未结束时 `answerVisible=false`（答案与逐题得分不泄露） |
+| 11 | 教师：`GET /api/admin/stats/exams` | `200`，返回开考/提交/均分/及格率 |
+| 12 | 打开 http://localhost:5173 | 登录后按角色显示菜单；学生端「我的考试」可看分与逐题回顾 |
 
 演示账号：`admin` / `teacher` / `student`，密码均为 `123456`。
 
@@ -108,7 +138,20 @@ curl.exe -s -X POST http://localhost:8080/api/auth/login ^
 
 ---
 
-## 三、常见问题
+## 四、已知限制
+
+- **主观题复核未实现**：简答题只做关键词粗筛并标记 `needReview`，教师改分接口尚未提供，成绩以当前机器分为准。
+- **暂存不校验答案取值**：如判断题传 `"B"` 会被原样存下、判 0 分（考试链路优先「不阻断考生」）。
+- **填空题空数靠题干下划线推断**：题干无下划线时按 1 空渲染。
+- **同一考生多标签页作答**：自动暂存互相覆盖，后写胜。
+- **前端全量引入 Element Plus**：主包 gzip 约 417KB，页面齐了再统一改按需引入。
+- **单实例假设**：定时任务未接 ShedLock，导出任务存内存（重启丢失）。
+- **测试覆盖不全**：目前仅 `ScoreRules` 22 条纯单测，集成测试（Testcontainers）与接口测试待补。
+- P-11 ~ P-22 等联调遗留项见 `docs/02-开发日志.md` 第 3.2 节。
+
+---
+
+## 五、常见问题
 
 **端口 8080 被占用 / 启动报 `Port already in use`**
 
@@ -127,7 +170,7 @@ taskkill /PID <pid> /F
 
 **改了表结构但没生效**
 
-Flyway 只执行未应用过的版本。新增变更请加 `V2__xxx.sql` 这样的新文件，**不要修改已执行过的 V1**，否则校验和不匹配会启动失败。
+Flyway 只执行未应用过的版本。新增变更请加 `V5__xxx.sql` 这样的新文件，**不要修改已执行过的 V1~V4**，否则校验和不匹配会启动失败。
 
 **控制台中文乱码**
 
@@ -149,3 +192,7 @@ esbuild 会往系统临时目录写文件，本机被权限拦住。把 `TMP`/`T
 mkdir -p .tmp
 TMP=$PWD/.tmp TEMP=$PWD/.tmp npm run build
 ```
+
+**`vite build` 二次构建报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`**
+
+环境的安全删除保护拦截批量删除 `dist/assets`。先 `git clean -fdxq dist` 再构建。
