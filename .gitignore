@@ -1,0 +1,33 @@
+# ---------- 构建产物 ----------
+backend/target/
+*.class
+*.jar
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# ---------- 前端 ----------
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ---------- IDE ----------
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---------- 环境与密钥（严禁入库） ----------
+deploy/.env
+.env
+.env.local
+*.pem
+*.key
+
+# ---------- 日志与临时文件 ----------
+*.log
+logs/
+*.tmp
+
+# ---------- 系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
