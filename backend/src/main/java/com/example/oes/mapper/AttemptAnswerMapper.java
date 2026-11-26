@@ -43,4 +43,25 @@ public interface AttemptAnswerMapper extends BaseMapper<AttemptAnswer> {
             </script>
             """)
     int upsertBatch(@Param("list") List<AttemptAnswer> list);
+
+    /**
+     * 一次 UPDATE 写回整卷得分。用 CASE id 而不是逐行 update，
+     * 42 题的卷子从 42 次往返压成 1 次。
+     */
+    @org.apache.ibatis.annotations.Update("""
+            <script>
+            UPDATE attempt_answer
+            SET score = CASE id
+                <foreach collection="list" item="i">WHEN #{i.id} THEN #{i.score}</foreach>
+                END,
+                judge_type = CASE id
+                <foreach collection="list" item="i">WHEN #{i.id} THEN #{i.judgeType}</foreach>
+                END,
+                judge_detail = CASE id
+                <foreach collection="list" item="i">WHEN #{i.id} THEN #{i.judgeDetail}</foreach>
+                END
+            WHERE attempt_id = #{attemptId}
+            </script>
+            """)
+    int updateJudgeBatch(@Param("attemptId") Long attemptId, @Param("list") List<AttemptAnswer> list);
 }

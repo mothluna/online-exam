@@ -1,6 +1,7 @@
 package com.example.oes.job;
 
 import com.example.oes.mapper.ExamAttemptMapper;
+import com.example.oes.service.JudgeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +22,7 @@ public class AttemptTimeoutJob {
     private static final int BATCH = 200;
 
     private final ExamAttemptMapper attemptMapper;
+    private final JudgeService judgeService;
 
     @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
     public void autoSubmitExpired() {
@@ -33,7 +35,16 @@ public class AttemptTimeoutJob {
         for (Long id : expiredIds) {
             // 仍用 CAS（WHERE status='IN_PROGRESS'）：
             // 若考生恰好在同一时刻提交，以先到者为准，不重复处理
-            submitted += attemptMapper.casTimeout(id);
+            if (attemptMapper.casTimeout(id) == 0) {
+                continue;
+            }
+            try {
+                judgeService.grade(id);
+            } catch (Exception e) {
+                // 判分失败不阻断后续答卷；该卷仍为 TIMEOUT，可由提交路径或人工重判补上
+                log.error("auto grade failed: attemptId={}", id, e);
+            }
+            submitted++;
         }
         log.info("timeout scan: candidates={}, auto submitted={}", expiredIds.size(), submitted);
     }

@@ -21,6 +21,7 @@ import com.example.oes.mapper.PaperMapper;
 import com.example.oes.mapper.PaperQuestionMapper;
 import com.example.oes.mapper.QuestionMapper;
 import com.example.oes.service.ExamTakingService;
+import com.example.oes.service.JudgeService;
 import com.example.oes.vo.AttemptVO;
 import com.example.oes.vo.StudentExamVO;
 import com.example.oes.vo.SubmitResultVO;
@@ -68,6 +69,7 @@ public class ExamTakingServiceImpl implements ExamTakingService {
     private final QuestionMapper questionMapper;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final JudgeService judgeService;
 
     @Override
     public List<StudentExamVO> listForStudent(Long userId) {
@@ -229,8 +231,10 @@ public class ExamTakingServiceImpl implements ExamTakingService {
     public SubmitResultVO submit(Long attemptId, Long userId) {
         ExamAttempt attempt = loadOwnedAttempt(attemptId, userId);
         if (!IN_PROGRESS.equals(attempt.getStatus())) {
-            // 幂等：已交卷/已超时直接返回既有结果
-            return toResult(attempt);
+            // 幂等：已交卷直接返回既有结果；若上次判分未完成（如任务中断），这里顺带补齐。
+            // 注意必须重新读库——判分改的是数据库，手上这份实体还是判分前的旧值
+            JudgeService.GradeResult existing = judgeService.grade(attemptId);
+            return toResult(attemptMapper.selectById(attemptId), existing);
         }
 
         boolean expired = LocalDateTime.now().isAfter(attempt.getDeadline());
@@ -240,15 +244,20 @@ public class ExamTakingServiceImpl implements ExamTakingService {
                 expired ? attempt.getDeadline() : LocalDateTime.now(), attempt.getVersion());
         if (affected == 0) {
             // 并发双提交：另一个线程已经跃迁，读回结果即可
-            return toResult(attemptMapper.selectById(attemptId));
+            ExamAttempt latest = attemptMapper.selectById(attemptId);
+            return toResult(latest, judgeService.grade(attemptId));
         }
+
+        // 判分与状态跃迁在同一事务内：任一步失败整体回滚，答卷回到 IN_PROGRESS 可重试
+        JudgeService.GradeResult gradeResult = judgeService.grade(attemptId);
 
         // 缓存清理必须放在事务提交后，否则回滚会留下"缓存已删、库里还有"的短暂不一致
         registerAfterCommit(() -> redis.delete(RedisKey.attemptDeadline(attemptId)));
 
         ExamAttempt latest = attemptMapper.selectById(attemptId);
-        log.info("attempt submitted: id={}, status={}, expired={}", attemptId, target, expired);
-        return toResult(latest);
+        log.info("attempt submitted: id={}, status={}, expired={}, total={}",
+                attemptId, target, expired, latest.getTotalScore());
+        return toResult(latest, gradeResult);
     }
 
     // ---------------- 内部方法 ----------------
@@ -372,14 +381,14 @@ public class ExamTakingServiceImpl implements ExamTakingService {
         return "NOT_STARTED";
     }
 
-    private SubmitResultVO toResult(ExamAttempt attempt) {
+    private SubmitResultVO toResult(ExamAttempt attempt, JudgeService.GradeResult gradeResult) {
         return SubmitResultVO.builder()
                 .attemptId(attempt.getId())
                 .status(attempt.getStatus())
                 .submitTime(attempt.getSubmitTime())
                 .totalScore(ScoreUtil.toYuan(attempt.getTotalScore() == null ? 0 : attempt.getTotalScore()))
                 .isPass(attempt.getIsPass())
-                .needReview(!GRADED.equals(attempt.getStatus()))
+                .needReview(gradeResult != null && gradeResult.needReview())
                 .build();
     }
 
