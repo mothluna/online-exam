@@ -9,6 +9,7 @@ import com.example.oes.service.StatService;
 import com.example.oes.vo.AttemptStatVO;
 import com.example.oes.vo.ExamStatVO;
 import com.example.oes.vo.ExportTaskVO;
+import com.example.oes.vo.ScoreBucketVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "07-记录统计")
@@ -52,6 +54,12 @@ public class StatController {
                                                  @RequestParam(defaultValue = "1") long page,
                                                  @RequestParam(defaultValue = "20") long size) {
         return R.ok(statService.pageAttempts(examId, page, size));
+    }
+
+    @Operation(summary = "分数分布（按满分十等分归桶）")
+    @GetMapping("/exams/{examId}/distribution")
+    public R<List<ScoreBucketVO>> distribution(@PathVariable Long examId) {
+        return R.ok(statService.scoreDistribution(examId));
     }
 
     /**

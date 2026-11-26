@@ -121,4 +121,36 @@ export async function upload<T>(url: string, file: File, field = 'file'): Promis
   return (response.data as R<T>).data
 }
 
+export type DownloadResult =
+  | { mode: 'file'; blob: Blob; filename: string }
+  | { mode: 'task'; taskId: string; rowCount: number }
+
+/**
+ * 下载接口有两种结果：后端小数据直接返回文件流，大数据返回 202 + JSON 任务。
+ * 用 content-type 区分，而不是靠状态码（axios 对两者都当成功）。
+ */
+export async function downloadOrTask(
+  url: string,
+  params?: Record<string, unknown>,
+): Promise<DownloadResult> {
+  const response = await instance.get(url, { params, responseType: 'blob' })
+  const contentType = String(response.headers['content-type'] ?? '')
+
+  if (contentType.includes('application/json')) {
+    const text = await (response.data as Blob).text()
+    const body = JSON.parse(text) as R<{ taskId: string; rowCount: number }>
+    return { mode: 'task', taskId: body.data.taskId, rowCount: body.data.rowCount }
+  }
+
+  const disposition = response.headers['content-disposition'] as string | undefined
+  let filename = 'export.xlsx'
+  if (disposition) {
+    const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+    if (utf8) {
+      filename = decodeURIComponent(utf8[1])
+    }
+  }
+  return { mode: 'file', blob: response.data as Blob, filename }
+}
+
 export { TOKEN_KEY }

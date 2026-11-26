@@ -42,6 +42,22 @@ public interface StatMapper {
     long countAttempts(@Param("examId") Long examId);
 
     /**
+     * 分数分布：按「得分 / 满分」的十等分归桶（0-10%、10-20% … 90-100%）。
+     * 用比例而不是绝对分，不同总分的试卷可以放在同一张图上比较。
+     * 返回的桶是稀疏的，缺失档位由服务层补 0。
+     */
+    @Select("""
+            SELECT LEAST(FLOOR(total_score * 10 / NULLIF(#{fullScore}, 0)), 9) AS bucket,
+                   COUNT(*) AS cnt
+            FROM exam_attempt
+            WHERE exam_id = #{examId} AND status <> 'IN_PROGRESS'
+            GROUP BY bucket
+            ORDER BY bucket
+            """)
+    List<Map<String, Object>> scoreDistribution(@Param("examId") Long examId,
+                                                @Param("fullScore") int fullScore);
+
+    /**
      * 考试分页。与试卷总分一次 JOIN 取出，避免"先查考试再批量查试卷"多一条 SQL ——
      * 这样整个统计列表严格是 3 条：count + 分页 + 聚合。
      */

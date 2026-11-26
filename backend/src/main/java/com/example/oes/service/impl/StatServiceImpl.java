@@ -5,11 +5,16 @@ import com.example.oes.common.result.PageResult;
 import com.example.oes.common.result.ResultCode;
 import com.example.oes.dto.ExamQuery;
 import com.example.oes.entity.Exam;
+import com.example.oes.entity.Paper;
 import com.example.oes.mapper.ExamMapper;
+import com.example.oes.mapper.PaperMapper;
 import com.example.oes.mapper.StatMapper;
 import com.example.oes.service.StatService;
 import com.example.oes.vo.AttemptStatVO;
 import com.example.oes.vo.ExamStatVO;
+import com.example.oes.vo.ScoreBucketVO;
+
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +32,7 @@ public class StatServiceImpl implements StatService {
 
     private final StatMapper statMapper;
     private final ExamMapper examMapper;
+    private final PaperMapper paperMapper;
 
     @Override
     public PageResult<ExamStatVO> pageExamStats(ExamQuery query) {
@@ -88,6 +94,35 @@ public class StatServiceImpl implements StatService {
         }
         List<AttemptStatVO> records = statMapper.pageAttempts(examId, (page - 1) * size, size);
         return PageResult.of(records, total, page, size);
+    }
+
+    @Override
+    public List<ScoreBucketVO> scoreDistribution(Long examId) {
+        Exam exam = examMapper.selectById(examId);
+        if (exam == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "考试不存在");
+        }
+        Paper paper = paperMapper.selectById(exam.getPaperId());
+        int fullScore = paper == null || paper.getTotalScore() == null ? 0 : paper.getTotalScore();
+        if (fullScore <= 0) {
+            return List.of();
+        }
+
+        Map<Integer, Long> counts = new HashMap<>();
+        for (Map<String, Object> row : statMapper.scoreDistribution(examId, fullScore)) {
+            Object bucket = row.get("bucket");
+            if (bucket != null) {
+                counts.put(((Number) bucket).intValue(), toLong(row.get("cnt")));
+            }
+        }
+
+        // 固定返回 10 档，前端不用处理缺档，柱子高度也可预期
+        List<ScoreBucketVO> result = new ArrayList<>(10);
+        for (int i = 0; i < 10; i++) {
+            result.add(new ScoreBucketVO((i * 10) + "-" + ((i + 1) * 10) + "%",
+                    counts.getOrDefault(i, 0L)));
+        }
+        return result;
     }
 
     private String blankToNull(String value) {
