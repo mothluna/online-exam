@@ -60,6 +60,23 @@ mvn -DskipTests package && java -jar target/oes-backend-1.0.0-SNAPSHOT.jar
 - `Project Structure → SDK` 选 17（路径指到具体版本目录 `jdk-17.0.2`，不要指 `current` 链接）；
 - `Settings → Build Tools → Maven`：Maven home 用 `D:\develop\maven\apache-maven-3.9.16`，User settings file 用 `C:\Users\Admin\.m2\settings.xml`——与命令行保持一致，否则本地仓库会分裂成两份重复下载。
 
+### 4. 前端（Vue 3 + Vite）
+
+```bash
+cd frontend
+npm install --registry=https://registry.npmmirror.com --cache .npm-cache
+npm run dev          # http://localhost:5173
+```
+
+开发期由 Vite 把 `/api` 代理到 `http://localhost:8080`，**后端必须先启动**。
+
+生产构建（Windows 需要把临时目录指到项目内，见常见问题）：
+
+```bash
+TMP=E:/workspace/online-exam/frontend/.tmp TEMP=... npm run build
+```
+
+
 ---
 
 ## 二、验证清单
@@ -119,3 +136,16 @@ Flyway 只执行未应用过的版本。新增变更请加 `V2__xxx.sql` 这样�
 **首次构建很慢**
 
 依赖走阿里云镜像（`~/.m2/settings.xml`），本地仓库在 `D:\develop\maven\repository`。首次约 1~2 分钟，之后增量构建在 10 秒级。
+
+**前端 `npm install` 报 `EPERM` / 缓存目录无权限**
+
+默认缓存在 `D:\develop\node\node_cache`，当前用户不可写。加 `--cache .npm-cache` 把缓存放到项目内。
+
+**前端 `vite build` 报 `Access is denied`（esbuild 临时文件）**
+
+esbuild 会往系统临时目录写文件，本机被权限拦住。把 `TMP`/`TEMP` 指到项目内：
+
+```bash
+mkdir -p .tmp
+TMP=$PWD/.tmp TEMP=$PWD/.tmp npm run build
+```

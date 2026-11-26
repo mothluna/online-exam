@@ -110,4 +110,15 @@ export async function download(url: string, params?: Record<string, unknown>) {
   return { blob: response.data as Blob, filename }
 }
 
+/** 上传单个文件；导入大文件耗时较长，单独放宽超时 */
+export async function upload<T>(url: string, file: File, field = 'file'): Promise<T> {
+  const form = new FormData()
+  form.append(field, file)
+  const response = await instance.post(url, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000,
+  })
+  return (response.data as R<T>).data
+}
+
 export { TOKEN_KEY }
