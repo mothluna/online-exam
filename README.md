@@ -6,7 +6,7 @@
 前端 Vue 3 + Element Plus + Vite + Pinia + Vue Router。
 
 ```
-docs/      需求分析与方案设计、环境检查报告、开发日志（含决策记录与问题清单）
+docs/      需求分析与方案设计、环境检查报告、开发日志、测试报告
 backend/   Spring Boot 后端（单模块，按 controller/service/mapper 分包）
 frontend/  Vue 3 前端（教师端 5 页 + 学生端 3 页）
 deploy/    docker-compose、初始化 SQL、环境自检脚本
@@ -101,6 +101,16 @@ mkdir -p .tmp
 TMP=$PWD/.tmp TEMP=$PWD/.tmp npm run build
 ```
 
+### 5. 运行测试
+
+```bash
+cd backend
+mvn test
+```
+
+集成测试需要本机 MySQL / Redis 已启动：自动创建并迁移 `oes_test` 库，Redis 使用 **DB 15**，
+与开发数据隔离；用例在事务内执行并回滚，可重复运行。详见 `docs/04-测试报告.md`。
+
 ---
 
 ## 三、验证清单
@@ -147,7 +157,7 @@ curl.exe -s -X POST http://localhost:8080/api/auth/login ^
 - **同一考生多标签页作答**：自动暂存互相覆盖，后写胜。
 - **前端全量引入 Element Plus**：主包 gzip 约 417KB，页面齐了再统一改按需引入。
 - **单实例假设**：定时任务未接 ShedLock，导出任务存内存（重启丢失）。
-- **测试覆盖不全**：目前仅 `ScoreRules` 22 条纯单测，集成测试（Testcontainers）与接口测试待补。
+- **测试**：`mvn test` 共 38 个自动化测试（判分/归一化/分值单测 + 3 个接口集成用例）；性能压测仍为手工脚本，未接入 CI，详见 `docs/04-测试报告.md`。
 - P-11 ~ P-22 等联调遗留项见 `docs/02-开发日志.md` 第 3.2 节。
 
 ---
