@@ -6,12 +6,18 @@ import com.example.oes.dto.QuestionQuery;
 import com.example.oes.dto.QuestionSaveRequest;
 import com.example.oes.security.RequireRole;
 import com.example.oes.security.UserContext;
+import com.example.oes.service.QuestionImportService;
 import com.example.oes.service.QuestionService;
+import com.example.oes.vo.ImportResultVO;
 import com.example.oes.vo.QuestionVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,7 +27,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
 
 @Tag(name = "03-题目")
 @RestController
@@ -31,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuestionController {
 
     private final QuestionService questionService;
+    private final QuestionImportService importService;
 
     @Operation(summary = "分页查询（不含答案与解析）")
     @GetMapping
@@ -69,5 +80,25 @@ public class QuestionController {
     public R<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
         questionService.changeStatus(id, status);
         return R.ok();
+    }
+
+    @Operation(summary = "Excel 批量导入")
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<ImportResultVO> importQuestions(@RequestPart("file") MultipartFile file) {
+        return R.ok(importService.importQuestions(file, UserContext.userId()));
+    }
+
+    @Operation(summary = "下载导入模板")
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> template() {
+        byte[] bytes = importService.template();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename("question-import-template.xlsx", StandardCharsets.UTF_8)
+                                .build().toString())
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
     }
 }

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.oes.common.enums.QuestionType;
 import com.example.oes.common.exception.BizException;
+import com.example.oes.common.model.OptionItem;
 import com.example.oes.common.result.PageResult;
 import com.example.oes.common.result.ResultCode;
 import com.example.oes.common.util.ScoreUtil;
@@ -17,6 +18,7 @@ import com.example.oes.entity.QuestionCategory;
 import com.example.oes.mapper.QuestionCategoryMapper;
 import com.example.oes.mapper.QuestionMapper;
 import com.example.oes.service.QuestionService;
+import com.example.oes.service.support.QuestionValidator;
 import com.example.oes.vo.QuestionVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -30,11 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,11 +41,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class QuestionServiceImpl implements QuestionService {
 
-    private static final Set<String> JUDGE_ANSWERS = Set.of("正确", "错误");
-
     private final QuestionMapper questionMapper;
     private final QuestionCategoryMapper categoryMapper;
     private final ObjectMapper objectMapper;
+    private final QuestionValidator validator;
 
     @Override
     public PageResult<QuestionVO> page(QuestionQuery query) {
@@ -86,7 +84,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(QuestionSaveRequest request, Long operatorId) {
         QuestionType type = QuestionType.of(request.getType());
-        validate(type, request);
+        List<OptionItem> options = prepareAndValidate(type, request);
         checkCategory(request.getCategoryId());
 
         String hash = StemNormalizer.hash(request.getStem());
@@ -97,7 +95,7 @@ public class QuestionServiceImpl implements QuestionService {
         }
 
         Question entity = new Question();
-        fill(entity, type, request);
+        fill(entity, type, request, options);
         entity.setStemHash(hash);
         entity.setCreatedBy(operatorId);
         try {
@@ -117,7 +115,7 @@ public class QuestionServiceImpl implements QuestionService {
             throw new BizException(ResultCode.NOT_FOUND, "题目不存在");
         }
         QuestionType type = QuestionType.of(request.getType());
-        validate(type, request);
+        List<OptionItem> options = prepareAndValidate(type, request);
         checkCategory(request.getCategoryId());
 
         String hash = StemNormalizer.hash(request.getStem());
@@ -129,7 +127,7 @@ public class QuestionServiceImpl implements QuestionService {
 
         Question update = new Question();
         update.setId(id);
-        fill(update, type, request);
+        fill(update, type, request, options);
         update.setStemHash(hash);
         try {
             questionMapper.updateById(update);
@@ -166,59 +164,19 @@ public class QuestionServiceImpl implements QuestionService {
 
     // ---------------- 内部方法 ----------------
 
-    private void validate(QuestionType type, QuestionSaveRequest request) {
-        List<String> answer = request.getAnswer() == null ? List.of() : request.getAnswer().stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        if (answer.isEmpty()) {
-            throw new BizException(ResultCode.PARAM_INVALID, "答案不能为空");
+    private List<OptionItem> prepareAndValidate(QuestionType type, QuestionSaveRequest request) {
+        List<OptionItem> options = new ArrayList<>();
+        if (request.getOptions() != null) {
+            for (QuestionSaveRequest.Option o : request.getOptions()) {
+                options.add(new OptionItem(
+                        o.getKey() == null ? null : o.getKey().trim(),
+                        o.getContent() == null ? null : o.getContent().trim()));
+            }
         }
+        List<String> answer = validator.normalizeAnswer(request.getAnswer());
+        validator.validate(type, options, answer);
         request.setAnswer(answer);
-
-        switch (type) {
-            case SINGLE, MULTIPLE -> {
-                List<QuestionSaveRequest.Option> options = request.getOptions();
-                if (options == null || options.size() < 2) {
-                    throw new BizException(ResultCode.PARAM_INVALID, "选择题至少需要 2 个选项");
-                }
-                Set<String> keys = new HashSet<>();
-                for (QuestionSaveRequest.Option option : options) {
-                    if (option.getKey() == null || option.getKey().isBlank()
-                            || option.getContent() == null || option.getContent().isBlank()) {
-                        throw new BizException(ResultCode.PARAM_INVALID, "选项的标识与内容都不能为空");
-                    }
-                    String key = option.getKey().trim();
-                    if (!keys.add(key)) {
-                        throw new BizException(ResultCode.PARAM_INVALID, "选项标识重复: " + key);
-                    }
-                    option.setKey(key);
-                }
-                if (type == QuestionType.SINGLE && answer.size() != 1) {
-                    throw new BizException(ResultCode.PARAM_INVALID, "单选题只能有一个正确答案");
-                }
-                if (type == QuestionType.MULTIPLE && answer.size() < 2) {
-                    throw new BizException(ResultCode.PARAM_INVALID, "多选题至少需要两个正确答案");
-                }
-                for (String a : answer) {
-                    if (!keys.contains(a)) {
-                        throw new BizException(ResultCode.PARAM_INVALID, "答案不在选项中: " + a);
-                    }
-                }
-            }
-            case JUDGE -> {
-                if (answer.size() != 1 || !JUDGE_ANSWERS.contains(answer.get(0))) {
-                    throw new BizException(ResultCode.PARAM_INVALID, "判断题答案只能是「正确」或「错误」");
-                }
-            }
-            case BLANK, SHORT -> {
-                if (request.getOptions() != null && !request.getOptions().isEmpty()) {
-                    throw new BizException(ResultCode.PARAM_INVALID, "填空题与简答题不应包含选项");
-                }
-            }
-            default -> throw new BizException(ResultCode.PARAM_INVALID, "不支持的题型");
-        }
+        return options;
     }
 
     private void checkCategory(Long categoryId) {
@@ -235,13 +193,13 @@ public class QuestionServiceImpl implements QuestionService {
                 .last("limit 1"));
     }
 
-    private void fill(Question entity, QuestionType type, QuestionSaveRequest request) {
+    private void fill(Question entity, QuestionType type, QuestionSaveRequest request, List<OptionItem> options) {
         entity.setCategoryId(request.getCategoryId());
         entity.setType(type.name());
         entity.setStem(request.getStem());
         entity.setAnswerJson(toJson(request.getAnswer()));
         boolean choice = type == QuestionType.SINGLE || type == QuestionType.MULTIPLE;
-        entity.setOptionsJson(choice ? toJson(request.getOptions()) : null);
+        entity.setOptionsJson(choice ? toJson(options) : null);
         entity.setAnalysis(request.getAnalysis());
         entity.setDifficulty(request.getDifficulty() == null ? 2 : request.getDifficulty());
         entity.setDefaultScore(ScoreUtil.toCent(request.getDefaultScore()));
@@ -289,14 +247,13 @@ public class QuestionServiceImpl implements QuestionService {
             return List.of();
         }
         try {
-            List<QuestionSaveRequest.Option> raw = objectMapper.readValue(json,
-                    new TypeReference<List<QuestionSaveRequest.Option>>() {
-                    });
+            List<OptionItem> raw = objectMapper.readValue(json, new TypeReference<List<OptionItem>>() {
+            });
             List<QuestionVO.Option> result = new ArrayList<>(raw.size());
-            for (QuestionSaveRequest.Option o : raw) {
+            for (OptionItem o : raw) {
                 QuestionVO.Option vo = new QuestionVO.Option();
-                vo.setKey(o.getKey());
-                vo.setContent(o.getContent());
+                vo.setKey(o.key());
+                vo.setContent(o.content());
                 result.add(vo);
             }
             return result;

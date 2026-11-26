@@ -8,6 +8,10 @@ server:
 spring:
   application:
     name: oes-backend
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/oes?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
