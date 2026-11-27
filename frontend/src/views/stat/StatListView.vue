@@ -40,6 +40,9 @@ const attemptSize = 10
 const detailLoading = ref(false)
 const exporting = ref(false)
 const exportTip = ref('')
+// 后台导出完成后不自动打开：window.open 在轮询回调里执行会脱离用户点击栈，可能被浏览器拦截。
+// 改成把链接存下来，由用户点「下载」触发，这个 open 就发生在点击回调内。
+const exportUrl = ref('')
 const reviewAttemptId = ref<number | null>(null)
 const reviewVisible = ref(false)
 
@@ -93,6 +96,8 @@ function resetQuery() {
 
 async function selectExam(row: ExamStat) {
   selected.value = row
+  exportUrl.value = ''
+  exportTip.value = ''
   buckets.value = []
   attempts.value = []
   attemptTotal.value = 0
@@ -145,13 +150,14 @@ async function pollTask(taskId: string) {
     await sleep(1000)
     const task = await fetchExportTask(taskId)
     if (task.status === 'DONE' && task.url) {
-      window.open(task.url, '_blank')
-      exportTip.value = ''
+      exportUrl.value = task.url
+      exportTip.value = `已生成 ${task.rowCount} 行，点击「下载」保存`
       ElMessage.success(`导出完成：${task.rowCount} 行`)
       return
     }
     if (task.status === 'FAILED') {
       exportTip.value = ''
+      exportUrl.value = ''
       ElMessage.error(task.message || '导出失败')
       return
     }
@@ -161,11 +167,19 @@ async function pollTask(taskId: string) {
   ElMessage.warning('导出仍在处理中，请稍后重试')
 }
 
+function openDownload() {
+  if (exportUrl.value) {
+    window.open(exportUrl.value, '_blank')
+  }
+}
+
 async function doExport() {
   if (!selected.value) {
     return
   }
   exporting.value = true
+  exportUrl.value = ''
+  exportTip.value = ''
   try {
     const result = await exportExam(selected.value.examId)
     if (result.mode === 'file') {
@@ -265,6 +279,9 @@ onMounted(loadList)
         <span class="detail-title">{{ selected.title }}</span>
         <div class="detail-actions">
           <span v-if="exportTip" class="export-tip">{{ exportTip }}</span>
+          <el-button v-if="exportUrl" type="success" plain @click="openDownload">
+            <el-icon><Download /></el-icon>下载
+          </el-button>
           <el-button type="primary" :loading="exporting" @click="doExport">
             <el-icon><Download /></el-icon>导出成绩单
           </el-button>
