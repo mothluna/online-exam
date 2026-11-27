@@ -4,7 +4,10 @@ import com.example.oes.common.result.PageResult;
 import com.example.oes.dto.UserCreateRequest;
 import com.example.oes.dto.UserQuery;
 import com.example.oes.dto.UserUpdateRequest;
+import com.example.oes.vo.BatchStatusResultVO;
 import com.example.oes.vo.UserVO;
+
+import java.util.List;
 
 public interface UserService {
 
@@ -20,6 +23,9 @@ public interface UserService {
 
     /** 启用/停用；停用会踢掉该用户所有会话 */
     void changeStatus(Long id, Integer status);
+
+    /** 批量启用/停用：逐条执行，跳过不合法的并回报原因 */
+    BatchStatusResultVO changeStatusBatch(List<Long> userIds, Integer status);
 
     /** 强制下线：递增权限版本，不删除账号 */
     void kick(Long id);

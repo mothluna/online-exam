@@ -52,6 +52,16 @@ export function changeUserStatus(id: number, status: number) {
   return patch<void>(`/admin/users/${id}/status`, undefined, { status })
 }
 
+export interface BatchStatusResult {
+  success: number
+  failures: { userId: number; reason: string }[]
+}
+
+/** 批量启用/停用：逐条执行，返回跳过明细 */
+export function batchChangeUserStatus(userIds: number[], status: number) {
+  return put<BatchStatusResult>('/admin/users/batch/status', { userIds, status })
+}
+
 export function kickUser(id: number) {
   return post<void>(`/admin/users/${id}/kick`)
 }

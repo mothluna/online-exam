@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ROLE_OPTIONS,
+  batchChangeUserStatus,
   changeUserStatus,
   deleteUser,
   fetchUsers,
@@ -23,6 +24,8 @@ const userStore = useUserStore()
 const list = ref<UserItem[]>([])
 const total = ref(0)
 const loading = ref(false)
+/** 勾选中的用户 id，批量操作只看这里 */
+const selectedIds = ref<number[]>([])
 
 const query = reactive({
   page: 1,
@@ -51,6 +54,34 @@ function roleTagType(role: string) {
 /** 停用/删除/强制下线自己会被后端拒绝，前端直接禁用，省一次无效点击 */
 function isSelf(row: UserItem) {
   return row.id === userStore.user?.id
+}
+
+function onSelectionChange(rows: UserItem[]) {
+  selectedIds.value = rows.map((row) => row.id)
+}
+
+async function batchStatus(status: number) {
+  if (!selectedIds.value.length) {
+    return
+  }
+  const action = status === 1 ? '启用' : '停用'
+  const tail = status === 0 ? '停用后对方会立即下线。' : ''
+  await ElMessageBox.confirm(`确定要${action}选中的 ${selectedIds.value.length} 个用户吗？${tail}`, `批量${action}`, {
+    type: 'warning',
+    confirmButtonText: action,
+  })
+  const result = await batchChangeUserStatus(selectedIds.value, status)
+  if (result.failures.length) {
+    // 自保护规则会被这一批触发到（自己那行、最后一个管理员），逐条说明为什么跳过
+    const skipped = result.failures.map((item) => {
+      const user = list.value.find((row) => row.id === item.userId)
+      return `${user?.username ?? item.userId}（${item.reason}）`
+    })
+    ElMessage.warning(`成功 ${result.success} 个，跳过 ${result.failures.length} 个：${skipped.join('；')}`)
+  } else {
+    ElMessage.success(`已${action} ${result.success} 个用户`)
+  }
+  await loadList()
 }
 
 async function loadList() {
@@ -174,12 +205,29 @@ onMounted(loadList)
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="resetQuery">重置</el-button>
       </div>
-      <el-button type="primary" @click="openCreate">
-        <el-icon><Plus /></el-icon>新增用户
-      </el-button>
+      <div class="toolbar-actions">
+        <el-button
+          :disabled="!selectedIds.length"
+          @click="batchStatus(1)"
+        >
+          批量启用<template v-if="selectedIds.length">（{{ selectedIds.length }}）</template>
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          :disabled="!selectedIds.length"
+          @click="batchStatus(0)"
+        >
+          批量停用<template v-if="selectedIds.length">（{{ selectedIds.length }}）</template>
+        </el-button>
+        <el-button type="primary" @click="openCreate">
+          <el-icon><Plus /></el-icon>新增用户
+        </el-button>
+      </div>
     </div>
 
-    <el-table v-loading="loading" :data="list" border stripe>
+    <el-table v-loading="loading" :data="list" row-key="id" border stripe @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="44" :selectable="(row: unknown) => !isSelf(asUser(row))" />
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="username" label="用户名" width="150" />
       <el-table-column prop="realName" label="姓名" min-width="120" />
@@ -238,6 +286,12 @@ onMounted(loadList)
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .filters {

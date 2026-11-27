@@ -4,10 +4,12 @@ import com.example.oes.common.result.PageResult;
 import com.example.oes.common.result.R;
 import com.example.oes.dto.PasswordResetRequest;
 import com.example.oes.dto.UserCreateRequest;
+import com.example.oes.dto.UserBatchStatusRequest;
 import com.example.oes.dto.UserQuery;
 import com.example.oes.dto.UserUpdateRequest;
 import com.example.oes.security.RequireRole;
 import com.example.oes.service.UserService;
+import com.example.oes.vo.BatchStatusResultVO;
 import com.example.oes.vo.UserVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,6 +66,12 @@ public class UserController {
     public R<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
         userService.changeStatus(id, status);
         return R.ok();
+    }
+
+    @Operation(summary = "批量启用/停用（逐条执行，跳过不合法的并回报原因）")
+    @PutMapping("/batch/status")
+    public R<BatchStatusResultVO> changeStatusBatch(@Valid @RequestBody UserBatchStatusRequest request) {
+        return R.ok(userService.changeStatusBatch(request.getUserIds(), request.getStatus()));
     }
 
     @Operation(summary = "强制下线")

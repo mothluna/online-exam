@@ -17,6 +17,7 @@ import com.example.oes.mapper.SysUserMapper;
 import com.example.oes.security.UserContext;
 import com.example.oes.service.AuthService;
 import com.example.oes.service.UserService;
+import com.example.oes.vo.BatchStatusResultVO;
 import com.example.oes.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 @Slf4j
@@ -144,6 +147,26 @@ public class UserServiceImpl implements UserService {
             authService.bumpAuthVersion(id);
             log.info("user disabled: id={}, tokens revoked", id);
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public BatchStatusResultVO changeStatusBatch(List<Long> userIds, Integer status) {
+        int success = 0;
+        List<BatchStatusResultVO.Failure> failures = new ArrayList<>();
+        for (Long id : userIds) {
+            try {
+                // 自调用不经过代理，事务由外层这个方法统一管理
+                changeStatus(id, status);
+                success++;
+            } catch (BizException e) {
+                // 自保护规则（不能停用自己、至少留一个管理员）在这一批里必然会被触发到，
+                // 逐条跳过并回报，比整批 400 更有用
+                failures.add(new BatchStatusResultVO.Failure(id, e.getMessage()));
+            }
+        }
+        log.info("batch status: status={}, success={}, failed={}", status, success, failures.size());
+        return new BatchStatusResultVO(success, failures);
     }
 
     @Override
