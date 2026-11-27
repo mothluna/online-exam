@@ -17,5 +17,11 @@ public interface StatService {
     PageResult<AttemptStatVO> pageAttempts(Long examId, long page, long size);
 
     /** 分数分布：按满分十等分归桶，缺失档位补 0，固定返回 10 档 */
-    List<ScoreBucketVO> scoreDistribution(Long examId);
+    /**
+     * 分数分布。
+     *
+     * @param mode `percent` 按满分十等分（默认，便于跨试卷比较）；
+     *             `absolute` 按每 5 分一档（能区分临界分数）
+     */
+    List<ScoreBucketVO> scoreDistribution(Long examId, String mode);
 }

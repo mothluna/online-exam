@@ -54,8 +54,10 @@ export function fetchAttemptStats(examId: number, page: number, size: number) {
   return get<PageResult<AttemptStat>>(`/admin/stats/exams/${examId}/attempts`, { page, size })
 }
 
-export function fetchDistribution(examId: number) {
-  return get<ScoreBucket[]>(`/admin/stats/exams/${examId}/distribution`)
+export type DistMode = 'percent' | 'absolute'
+
+export function fetchDistribution(examId: number, mode: DistMode = 'percent') {
+  return get<ScoreBucket[]>(`/admin/stats/exams/${examId}/distribution?mode=${mode}`)
 }
 
 /** 导出：小数据直接拿 blob，大数据拿 taskId */

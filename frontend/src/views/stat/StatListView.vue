@@ -5,6 +5,7 @@ import {
   exportExam,
   fetchAttemptStats,
   fetchDistribution,
+  type DistMode,
   fetchExamStats,
   fetchExportTask,
   type AttemptStat,
@@ -33,6 +34,8 @@ const query = reactive({
 
 const selected = ref<ExamStat | null>(null)
 const buckets = ref<ScoreBucket[]>([])
+/** 分档方式：百分比便于跨试卷比较，绝对分能看出临界分数 */
+const distMode = ref<DistMode>('percent')
 const attempts = ref<AttemptStat[]>([])
 const attemptTotal = ref(0)
 const attemptPage = ref(1)
@@ -105,7 +108,7 @@ async function selectExam(row: ExamStat) {
   detailLoading.value = true
   try {
     const [dist, page] = await Promise.all([
-      fetchDistribution(row.examId),
+      fetchDistribution(row.examId, distMode.value),
       fetchAttemptStats(row.examId, 1, attemptSize),
     ])
     buckets.value = dist
@@ -114,6 +117,13 @@ async function selectExam(row: ExamStat) {
   } finally {
     detailLoading.value = false
   }
+}
+
+async function changeDistMode() {
+  if (!selected.value) {
+    return
+  }
+  buckets.value = await fetchDistribution(selected.value.examId, distMode.value)
 }
 
 async function loadAttempts(page: number) {
@@ -324,7 +334,13 @@ onMounted(loadList)
       </el-col>
     </el-row>
 
-    <div class="section-title">分数分布（按满分百分比）</div>
+    <div class="section-title">
+      分数分布
+      <el-radio-group v-model="distMode" size="small" class="dist-mode" @change="changeDistMode">
+        <el-radio-button value="percent">按百分比</el-radio-button>
+        <el-radio-button value="absolute">按 5 分</el-radio-button>
+      </el-radio-group>
+    </div>
     <ScoreDistChart v-if="buckets.length" :buckets="buckets" />
     <el-empty v-else description="暂无提交数据" :image-size="80" />
 
@@ -465,5 +481,10 @@ onMounted(loadList)
   font-weight: 600;
   font-size: 14px;
   margin: 18px 0 10px;
+}
+
+.dist-mode {
+  margin-left: 12px;
+  font-weight: 400;
 }
 </style>

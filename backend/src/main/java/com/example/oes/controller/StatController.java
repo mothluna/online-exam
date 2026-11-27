@@ -56,10 +56,11 @@ public class StatController {
         return R.ok(statService.pageAttempts(examId, page, size));
     }
 
-    @Operation(summary = "分数分布（按满分十等分归桶）")
+    @Operation(summary = "分数分布（mode=percent 十等分 / absolute 每 5 分一档）")
     @GetMapping("/exams/{examId}/distribution")
-    public R<List<ScoreBucketVO>> distribution(@PathVariable Long examId) {
-        return R.ok(statService.scoreDistribution(examId));
+    public R<List<ScoreBucketVO>> distribution(@PathVariable Long examId,
+                                               @RequestParam(defaultValue = "percent") String mode) {
+        return R.ok(statService.scoreDistribution(examId, mode));
     }
 
     /**

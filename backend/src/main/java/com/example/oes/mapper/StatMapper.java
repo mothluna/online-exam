@@ -58,6 +58,21 @@ public interface StatMapper {
                                                 @Param("fullScore") int fullScore);
 
     /**
+     * 分数分布（绝对分档）：按「每档多少分」归桶，bucket 从 0 开始。
+     * 与按百分比分档互补——百分比便于跨试卷比较，绝对分能看出 60 分与 69 分的差别。
+     */
+    @Select("""
+            SELECT FLOOR(total_score / #{bucketSize}) AS bucket,
+                   COUNT(*) AS cnt
+            FROM exam_attempt
+            WHERE exam_id = #{examId} AND status <> 'IN_PROGRESS'
+            GROUP BY bucket
+            ORDER BY bucket
+            """)
+    List<Map<String, Object>> absoluteDistribution(@Param("examId") Long examId,
+                                                   @Param("bucketSize") int bucketSize);
+
+    /**
      * 考试分页。与试卷总分一次 JOIN 取出，避免"先查考试再批量查试卷"多一条 SQL ——
      * 这样整个统计列表严格是 3 条：count + 分页 + 聚合。
      */

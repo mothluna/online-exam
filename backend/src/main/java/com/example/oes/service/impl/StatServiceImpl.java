@@ -97,7 +97,7 @@ public class StatServiceImpl implements StatService {
     }
 
     @Override
-    public List<ScoreBucketVO> scoreDistribution(Long examId) {
+    public List<ScoreBucketVO> scoreDistribution(Long examId, String mode) {
         Exam exam = examMapper.selectById(examId);
         if (exam == null) {
             throw new BizException(ResultCode.NOT_FOUND, "考试不存在");
@@ -106,6 +106,10 @@ public class StatServiceImpl implements StatService {
         int fullScore = paper == null || paper.getTotalScore() == null ? 0 : paper.getTotalScore();
         if (fullScore <= 0) {
             return List.of();
+        }
+
+        if ("absolute".equalsIgnoreCase(mode)) {
+            return absoluteDistribution(examId, fullScore);
         }
 
         Map<Integer, Long> counts = new HashMap<>();
@@ -121,6 +125,28 @@ public class StatServiceImpl implements StatService {
         for (int i = 0; i < 10; i++) {
             result.add(new ScoreBucketVO((i * 10) + "-" + ((i + 1) * 10) + "%",
                     counts.getOrDefault(i, 0L)));
+        }
+        return result;
+    }
+
+    /** 绝对分档：每 5 分一档，档数由满分决定，缺档补 0 */
+    private List<ScoreBucketVO> absoluteDistribution(Long examId, int fullScore) {
+        final int stepCent = 500; // 5 分
+        Map<Integer, Long> counts = new HashMap<>();
+        for (Map<String, Object> row : statMapper.absoluteDistribution(examId, stepCent)) {
+            Object bucket = row.get("bucket");
+            if (bucket != null) {
+                counts.put(((Number) bucket).intValue(), toLong(row.get("cnt")));
+            }
+        }
+
+        int bucketCount = (fullScore + stepCent - 1) / stepCent;
+        int fullScoreYuan = fullScore / 100;
+        List<ScoreBucketVO> result = new ArrayList<>(bucketCount);
+        for (int i = 0; i < bucketCount; i++) {
+            int from = i * 5;
+            int to = Math.min((i + 1) * 5, fullScoreYuan);
+            result.add(new ScoreBucketVO(from + "-" + to + " 分", counts.getOrDefault(i, 0L)));
         }
         return result;
     }
