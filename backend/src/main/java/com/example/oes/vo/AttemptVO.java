@@ -38,6 +38,9 @@ public class AttemptVO {
 
     private List<AnswerVO> answers;
 
+    /** 本次作答会话号；多标签页只保留最后一次加载的那一个 */
+    private String sessionId;
+
     @Data
     @Builder
     public static class QuestionVO {

@@ -17,12 +17,19 @@ public final class RedisKey {
     /** 登录失败计数，用于锁定 */
     private static final String LOGIN_FAIL = "oes:login:fail:%s";
 
+    /** 答卷的当前作答会话，用于识别多标签页互相覆盖 */
+    private static final String ATTEMPT_SESSION = "oes:attempt:session:%s";
+
     public static String token(String jti) {
         return TOKEN.formatted(jti);
     }
 
     public static String authVersion(Long userId) {
         return AUTH_VERSION.formatted(userId);
+    }
+
+    public static String attemptSession(Long attemptId) {
+        return ATTEMPT_SESSION.formatted(attemptId);
     }
 
     public static String loginFail(String username) {

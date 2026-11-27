@@ -43,6 +43,8 @@ const saveFailures = ref(0)
 const nextRetryAt = ref(0)
 /** 每秒刷新的时间戳，用来驱动"x 秒后重试"的倒计时 */
 const nowTs = ref(Date.now())
+/** 另一个窗口接管了本答卷：停止自动保存并常驻提示，不再弹 toast */
+const sessionConflict = ref(false)
 
 let tickTimer: number | undefined
 let autoSaveTimer: number | undefined
@@ -182,6 +184,7 @@ async function flush(force = false): Promise<boolean> {
     const cleaned = await saveAnswers(
       attemptId,
       ids.map((id) => ({ questionId: id, answer: answers[id] ?? [] })),
+      attempt.value?.sessionId,
     )
     // 服务端会剔除非法取值（如判断题传了 B）。不阻断保存，但要如实告诉考生哪几题没存成
     if (cleaned?.length) {
@@ -203,6 +206,13 @@ async function flush(force = false): Promise<boolean> {
     // 失败的题目放回队列，下一轮自动重试；不要静默丢弃用户答案
     ids.forEach((id) => dirty.add(id))
     const status = (error as { response?: { status?: number } }).response?.status
+    const code = (error as { response?: { data?: { code?: number } } }).response?.data?.code
+    if (code === 40904) {
+      // 另一个标签页接管了这份答卷。绝不能走"自动交卷"——那会把本窗口的旧状态当作最终答案
+      sessionConflict.value = true
+      stopTimers()
+      return false
+    }
     if (status === 409) {
       // 已超时或已提交：停止自动暂存，提示用户交卷
       stopTimers()
@@ -254,6 +264,11 @@ async function submit(auto = false) {
     return
   }
   if (attempt.value.status !== 'IN_PROGRESS') {
+    return
+  }
+  if (sessionConflict.value && !auto) {
+    // 本窗口的答案已经不是最新的，交卷只会以另一个窗口的作答为准，先拦住并说明
+    ElMessage.warning('该答卷已在其他窗口作答，请回到那个窗口交卷')
     return
   }
 
@@ -310,6 +325,16 @@ onBeforeUnmount(() => {
 <template>
   <div v-loading="loading" class="exam-page">
     <template v-if="attempt">
+      <!-- 多标签页接管：常驻提示，且此时自动保存已停、交卷被拦 -->
+      <el-alert
+        v-if="sessionConflict"
+        type="error"
+        :closable="false"
+        show-icon
+        class="conflict-tip"
+        title="这份答卷已在另一个窗口打开"
+        description="本窗口已停止自动保存，继续作答不会生效。请回到另一个窗口作答；若那里已关闭，刷新本页即可重新接管。"
+      />
       <!-- 顶部信息条：倒计时是服务端时间换算，改本机时钟无效 -->
       <div class="topbar">
         <div class="left">
@@ -509,6 +534,10 @@ onBeforeUnmount(() => {
 
 .saved.saving {
   color: var(--el-color-primary);
+}
+
+.conflict-tip {
+  margin-bottom: 10px;
 }
 
 .saved.error {

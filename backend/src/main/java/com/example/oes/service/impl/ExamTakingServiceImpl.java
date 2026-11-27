@@ -49,6 +49,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -203,7 +204,15 @@ public class ExamTakingServiceImpl implements ExamTakingService {
     public AttemptVO getAttempt(Long attemptId, Long userId) {
         ExamAttempt attempt = loadOwnedAttempt(attemptId, userId);
         Exam exam = examMapper.selectById(attempt.getExamId());
-        return buildAttempt(attempt, exam);
+        AttemptVO vo = buildAttempt(attempt, exam);
+
+        // 每次进入作答页都换发会话号：后开的窗口接管，先开的窗口再保存时会被识别为过期。
+        // TTL 取"距截止时间 + 5 分钟"，交卷后自然过期，不需要额外清理。
+        String sessionId = UUID.randomUUID().toString();
+        long ttl = Math.max(600, Duration.between(LocalDateTime.now(), attempt.getDeadline()).toSeconds() + 300);
+        redis.opsForValue().set(RedisKey.attemptSession(attemptId), sessionId, Duration.ofSeconds(ttl));
+        vo.setSessionId(sessionId);
+        return vo;
     }
 
     @Override
@@ -215,6 +224,15 @@ public class ExamTakingServiceImpl implements ExamTakingService {
         }
         if (LocalDateTime.now().isAfter(attempt.getDeadline())) {
             throw new BizException(ResultCode.ALREADY_SUBMITTED, "已超过截止时间，无法保存答案");
+        }
+
+        // 多标签页保护：会话号与 Redis 中记录的不一致，说明另一个窗口后打开了作答页。
+        // 这里拒绝写入，避免两个窗口各自的本地状态交替覆盖对方的答案。
+        String currentSession = redis.opsForValue().get(RedisKey.attemptSession(attemptId));
+        if (currentSession != null && request.getSessionId() != null
+                && !currentSession.equals(request.getSessionId())) {
+            throw new BizException(ResultCode.ATTEMPT_SESSION_CONFLICT,
+                    "该答卷已在其他窗口打开，本窗口已停止自动保存；如需继续请刷新本页");
         }
 
         List<AttemptAnswer> rows = answerMapper.selectByAttempt(attemptId);

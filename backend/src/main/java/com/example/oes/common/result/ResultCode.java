@@ -25,6 +25,7 @@ public enum ResultCode {
     ALREADY_STARTED(40901, "已开考，请继续作答", HttpStatus.CONFLICT),
     ALREADY_SUBMITTED(40902, "已交卷，不可重复提交", HttpStatus.CONFLICT),
     DUPLICATE_STEM(40903, "题干重复", HttpStatus.CONFLICT),
+    ATTEMPT_SESSION_CONFLICT(40904, "该答卷已在其他窗口打开", HttpStatus.CONFLICT),
 
     PAPER_SCORE_MISMATCH(42201, "试卷总分与规则不一致", HttpStatus.UNPROCESSABLE_ENTITY),
     POOL_INSUFFICIENT(42202, "题池数量不足", HttpStatus.UNPROCESSABLE_ENTITY),

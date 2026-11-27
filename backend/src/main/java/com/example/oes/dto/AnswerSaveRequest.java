@@ -18,6 +18,12 @@ public class AnswerSaveRequest {
     @Valid
     private List<Item> items;
 
+    /**
+     * 作答会话号，取自 {@code GET /attempts/{id}}。
+     * 允许为空：兼容未传会话的调用方（如集成测试），此时不做多标签页校验。
+     */
+    private String sessionId;
+
     @Data
     public static class Item {
         @NotNull(message = "题目 ID 不能为空")

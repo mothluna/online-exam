@@ -78,6 +78,8 @@ export interface Attempt {
   totalCount: number
   questions: AttemptQuestion[]
   answers: AttemptAnswer[]
+  /** 本次作答会话号；多标签页只保留最后一次加载的 */
+  sessionId?: string
 }
 
 export interface QuestionResult {
@@ -164,8 +166,12 @@ export function fetchAttempt(attemptId: number) {
 }
 
 /** 暂存答案；返回被服务端清洗过的题号（非法取值被剔除） */
-export function saveAnswers(attemptId: number, items: { questionId: number; answer: string[] }[]) {
-  return put<number[]>(`/student/attempts/${attemptId}/answers`, { items })
+export function saveAnswers(
+  attemptId: number,
+  items: { questionId: number; answer: string[] }[],
+  sessionId?: string,
+) {
+  return put<number[]>(`/student/attempts/${attemptId}/answers`, { items, sessionId })
 }
 
 export function submitAttempt(attemptId: number) {
