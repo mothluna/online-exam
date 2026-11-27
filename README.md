@@ -120,7 +120,7 @@ mvn test
 | # | 操作 | 期望 |
 |---|---|---|
 | 1 | `GET http://localhost:8080/api/ping` | `200`，`{"code":0,...,"java":"17.0.2"}` |
-| 2 | 打开 http://localhost:8080/doc.html | Knife4j 文档页，按 `01-认证` ~ `06-考试作答` 等分组列出全部接口 |
+| 2 | 打开 http://localhost:8080/doc.html | Knife4j 文档页，标题为「在线考试系统 API」，左侧按 `00-系统` ~ `09-主观题复核` 共 10 个分组列出 53 个接口；右上角 Authorize 可填 token |
 | 3 | `POST /api/auth/login`（student / 123456） | `200`，返回 token、角色与用户信息 |
 | 4 | `GET /api/auth/me`（带 token） | `200` |
 | 5 | `GET /api/admin/questions`（学生 token） | **403 / 40300** |
