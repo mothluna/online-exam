@@ -14,6 +14,13 @@ const route = useRoute()
 const router = useRouter()
 const attemptId = Number(route.params.attemptId)
 
+/**
+ * 简答题字数上限。数据库 answer_json 是 JSON 列，本身没有这个限制，
+ * 这里纯粹是客户端体验约束：给出可见的计数器，避免提交几千字的文本把页面撑坏。
+ * 判分依据 judge_detail 只有 500 字符，超长答案对机器粗筛也没有额外价值。
+ */
+const SHORT_MAX_LENGTH = 2000
+
 const attempt = ref<Attempt | null>(null)
 const loading = ref(true)
 const saving = ref(false)
@@ -339,13 +346,15 @@ onBeforeUnmount(() => {
               />
             </div>
 
-            <!-- 简答 -->
+            <!-- 简答：给字数上限与实时计数，避免超长文本把排版撑坏 -->
             <el-input
               v-else
               :model-value="answers[q.questionId]?.[0] ?? ''"
               :disabled="!isRunning"
               type="textarea"
               :rows="4"
+              :maxlength="SHORT_MAX_LENGTH"
+              show-word-limit
               placeholder="请作答"
               @update:model-value="(v: unknown) => setText(q.questionId, String(v))"
             />
