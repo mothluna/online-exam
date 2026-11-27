@@ -50,12 +50,11 @@ public class StudentExamController {
         return R.ok(examTakingService.getAttempt(attemptId, UserContext.userId()));
     }
 
-    @Operation(summary = "批量暂存答案（幂等）")
+    @Operation(summary = "批量暂存答案（幂等；非法取值会被剔除并回报题号）")
     @PutMapping("/attempts/{attemptId}/answers")
-    public R<Void> saveAnswers(@PathVariable Long attemptId,
-                               @Valid @RequestBody AnswerSaveRequest request) {
-        examTakingService.saveAnswers(attemptId, UserContext.userId(), request);
-        return R.ok();
+    public R<List<Long>> saveAnswers(@PathVariable Long attemptId,
+                                     @Valid @RequestBody AnswerSaveRequest request) {
+        return R.ok(examTakingService.saveAnswers(attemptId, UserContext.userId(), request));
     }
 
     @Operation(summary = "成绩单（考试结束前不返回答案）")

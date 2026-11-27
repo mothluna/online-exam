@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,6 +62,14 @@ public class ExamTakingServiceImpl implements ExamTakingService {
     private static final String SUBMITTED = "SUBMITTED";
     private static final String TIMEOUT = "TIMEOUT";
     private static final String GRADED = "GRADED";
+
+    /** 判断题的唯一合法取值：与前端 radio 的 value、题库答案的存法保持一致 */
+    private static final Set<String> JUDGE_VALUES = Set.of("正确", "错误");
+    /** 简答答案上限，与前端 textarea 的 maxlength 对齐 */
+    private static final int SHORT_MAX_LEN = 2000;
+    /** 单空长度与最多空格数：只做防御，不据此判分 */
+    private static final int BLANK_MAX_LEN = 200;
+    private static final int BLANK_MAX_COUNT = 20;
 
     private final ExamMapper examMapper;
     private final ExamAttemptMapper attemptMapper;
@@ -199,7 +208,7 @@ public class ExamTakingServiceImpl implements ExamTakingService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void saveAnswers(Long attemptId, Long userId, AnswerSaveRequest request) {
+    public List<Long> saveAnswers(Long attemptId, Long userId, AnswerSaveRequest request) {
         ExamAttempt attempt = loadOwnedAttempt(attemptId, userId);
         if (!IN_PROGRESS.equals(attempt.getStatus())) {
             throw new BizException(ResultCode.ALREADY_SUBMITTED, "试卷已提交，不能再修改答案");
@@ -213,22 +222,90 @@ public class ExamTakingServiceImpl implements ExamTakingService {
                 .collect(Collectors.toMap(AttemptAnswer::getQuestionId, AttemptAnswer::getSortNo));
         Set<Long> validIds = new HashSet<>(sortNoMap.keySet());
 
+        // 校验取值域需要题型与选项，一次批量取回，避免逐题查库
+        Map<Long, Question> questionMap = validIds.isEmpty() ? Map.of()
+                : questionMapper.selectBatchIds(validIds).stream()
+                .collect(Collectors.toMap(Question::getId, q -> q));
+
+        // 被清洗过的题目：不阻断保存，但要让前端知道"这条没存成你发的样子"
+        Set<Long> sanitized = new LinkedHashSet<>();
         List<AttemptAnswer> upserts = new ArrayList<>(request.getItems().size());
         for (AnswerSaveRequest.Item item : request.getItems()) {
             if (!validIds.contains(item.getQuestionId())) {
                 throw new BizException(ResultCode.PARAM_INVALID,
                         "题目不属于本试卷: " + item.getQuestionId());
             }
+            Question question = questionMap.get(item.getQuestionId());
+            List<String> answer = question == null
+                    ? item.getAnswer()
+                    : sanitizeAnswer(question, item.getAnswer(), sanitized);
+
             AttemptAnswer row = new AttemptAnswer();
             row.setAttemptId(attemptId);
             row.setQuestionId(item.getQuestionId());
-            row.setAnswerJson(toJson(item.getAnswer()));
+            row.setAnswerJson(toJson(answer));
             row.setSortNo(sortNoMap.get(item.getQuestionId()));
             upserts.add(row);
         }
         if (!upserts.isEmpty()) {
             answerMapper.upsertBatch(upserts);
         }
+        return new ArrayList<>(sanitized);
+    }
+
+    /**
+     * 按题型收敛答案取值。
+     *
+     * <p>这里刻意**不抛异常**：考试链路的第一原则是不阻断考生（见开发日志 3.3），
+     * 客户端格式异常不应该让一次暂存整体失败、进而让考生以为答案丢了。
+     * 做法是把非法值剔掉、超长值截断，并把受影响的题目回传给前端提示一次。
+     *
+     * <p>被剔掉的值与"未作答"在库里表现一致，这正是想要的：非法输入本来就不该有语义。
+     */
+    private List<String> sanitizeAnswer(Question question, List<String> raw, Set<Long> sanitized) {
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+        QuestionType type = QuestionType.valueOf(question.getType());
+        List<String> cleaned;
+        switch (type) {
+            case SINGLE -> {
+                String value = raw.get(0);
+                cleaned = validOptionKeys(question).contains(value) ? List.of(value) : List.of();
+            }
+            case MULTIPLE -> cleaned = raw.stream()
+                    .filter(validOptionKeys(question)::contains)
+                    .distinct()
+                    .toList();
+            case JUDGE -> {
+                String value = raw.get(0);
+                cleaned = JUDGE_VALUES.contains(value) ? List.of(value) : List.of();
+            }
+            case BLANK -> cleaned = raw.stream()
+                    .limit(BLANK_MAX_COUNT)
+                    .map(v -> truncate(v, BLANK_MAX_LEN))
+                    .toList();
+            case SHORT -> cleaned = List.of(truncate(raw.get(0), SHORT_MAX_LEN));
+            default -> cleaned = raw;
+        }
+        // 单选/多选/判断被剔空，或数量被 limit 截断，都算"被清洗"
+        if (cleaned.isEmpty() || cleaned.size() < raw.size()) {
+            sanitized.add(question.getId());
+        }
+        return cleaned;
+    }
+
+    private Set<String> validOptionKeys(Question question) {
+        return parseOptions(question.getOptionsJson()).stream()
+                .map(AttemptVO.Option::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     @Override

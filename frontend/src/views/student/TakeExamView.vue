@@ -34,6 +34,8 @@ const clockOffset = ref(0)
 
 const answers = reactive<Record<number, string[]>>({})
 const dirty = new Set<number>()
+// 已被服务端清洗过的题目只提示一次，避免每次自动暂存都弹窗
+const sanitizedNotified = new Set<number>()
 
 let tickTimer: number | undefined
 let autoSaveTimer: number | undefined
@@ -155,10 +157,22 @@ async function flush(): Promise<boolean> {
   dirty.clear()
   saving.value = true
   try {
-    await saveAnswers(
+    const cleaned = await saveAnswers(
       attemptId,
       ids.map((id) => ({ questionId: id, answer: answers[id] ?? [] })),
     )
+    // 服务端会剔除非法取值（如判断题传了 B）。不阻断保存，但要如实告诉考生哪几题没存成
+    if (cleaned?.length) {
+      const fresh = cleaned.filter((id) => !sanitizedNotified.has(id))
+      fresh.forEach((id) => sanitizedNotified.add(id))
+      if (fresh.length) {
+        const labels = fresh.map((id) => {
+          const item = attempt.value?.questions.find((q) => q.questionId === id)
+          return item ? `第 ${item.sortNo} 题` : `题目 ${id}`
+        })
+        ElMessage.warning(`${labels.join('、')}的作答格式不被接受，已按未作答保存`)
+      }
+    }
     lastSavedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     return true
   } catch (error) {

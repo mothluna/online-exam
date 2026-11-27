@@ -20,7 +20,11 @@ public interface ExamTakingService {
     AttemptVO getAttempt(Long attemptId, Long userId);
 
     /** 批量暂存，幂等 */
-    void saveAnswers(Long attemptId, Long userId, AnswerSaveRequest request);
+    /**
+     * 暂存答案。按题型收敛取值域（非法值剔除、超长截断），不阻断保存；
+     * 返回被清洗过的题目 id，供前端提示。
+     */
+    List<Long> saveAnswers(Long attemptId, Long userId, AnswerSaveRequest request);
 
     /** 交卷。幂等：重复提交返回同一结果，不重复判分 */
     SubmitResultVO submit(Long attemptId, Long userId);

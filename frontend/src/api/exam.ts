@@ -161,8 +161,9 @@ export function fetchAttempt(attemptId: number) {
   return get<Attempt>(`/student/attempts/${attemptId}`)
 }
 
+/** 暂存答案；返回被服务端清洗过的题号（非法取值被剔除） */
 export function saveAnswers(attemptId: number, items: { questionId: number; answer: string[] }[]) {
-  return put<void>(`/student/attempts/${attemptId}/answers`, { items })
+  return put<number[]>(`/student/attempts/${attemptId}/answers`, { items })
 }
 
 export function submitAttempt(attemptId: number) {
