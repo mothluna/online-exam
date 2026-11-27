@@ -48,6 +48,8 @@ public class AttemptVO {
         private List<Option> options;
         private BigDecimal score;
         private Integer sortNo;
+        /** 填空题空数；前端据此渲染输入框，不再数题干下划线 */
+        private Integer blankCount;
     }
 
     @Data

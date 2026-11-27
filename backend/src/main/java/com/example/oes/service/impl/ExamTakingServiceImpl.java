@@ -473,6 +473,7 @@ public class ExamTakingServiceImpl implements ExamTakingService {
                     .options(options)
                     .score(ScoreUtil.toYuan(scoreMap.getOrDefault(q.getId(), 0)))
                     .sortNo(answer.getSortNo())
+                    .blankCount(q.getBlankCount() == null ? 1 : q.getBlankCount())
                     .build());
             List<String> saved = parseAnswer(answer.getAnswerJson());
             if (!saved.isEmpty()) {

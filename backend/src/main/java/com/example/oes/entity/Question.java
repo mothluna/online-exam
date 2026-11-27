@@ -30,6 +30,9 @@ public class Question {
     /** JSON 字符串：["A"] / ["A","C"] / ["正确"] */
     private String answerJson;
 
+    /** 填空题空数（= 答案数组长度）；非填空题恒为 1，由服务端写入，不接受前端指定 */
+    private Integer blankCount;
+
     private String analysis;
 
     /** 1 易，2 中，3 难 */

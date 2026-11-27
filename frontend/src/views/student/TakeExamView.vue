@@ -80,8 +80,15 @@ function parseTime(value: string): number {
   return new Date(value.replace(' ', 'T')).getTime()
 }
 
-function blankCount(stem: string): number {
-  const matched = stem.match(/_{2,}/g)
+/**
+ * 填空题空数：优先用服务端下发的 blank_count（= 答案数组长度）。
+ * 只有在字段缺失（老接口/老数据）时才退回数下划线，且保持至少 1 空。
+ */
+function blankCount(question: { blankCount?: number; stem: string }): number {
+  if (question.blankCount && question.blankCount > 0) {
+    return question.blankCount
+  }
+  const matched = question.stem.match(/_{2,}/g)
   return matched && matched.length ? matched.length : 1
 }
 
@@ -377,7 +384,7 @@ onBeforeUnmount(() => {
             <!-- 填空：按题干中下划线数量渲染输入框 -->
             <div v-else-if="q.type === 'BLANK'" class="blanks">
               <el-input
-                v-for="i in blankCount(q.stem)"
+                v-for="i in blankCount(q)"
                 :key="i"
                 :model-value="answers[q.questionId]?.[i - 1] ?? ''"
                 :disabled="!isRunning"

@@ -55,6 +55,8 @@ export interface AttemptQuestion {
   options: { key: string; content: string }[]
   score: number
   sortNo: number
+  /** 填空题空数，由服务端按答案数组长度给出 */
+  blankCount?: number
 }
 
 export interface AttemptAnswer {

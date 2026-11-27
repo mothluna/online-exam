@@ -200,6 +200,8 @@ public class QuestionServiceImpl implements QuestionService {
         entity.setAnswerJson(toJson(request.getAnswer()));
         boolean choice = type == QuestionType.SINGLE || type == QuestionType.MULTIPLE;
         entity.setOptionsJson(choice ? toJson(options) : null);
+        // 空数由答案数组长度决定，与判分时逐空比对的口径一致
+        entity.setBlankCount(type == QuestionType.BLANK ? Math.max(1, request.getAnswer().size()) : 1);
         entity.setAnalysis(request.getAnalysis());
         entity.setDifficulty(request.getDifficulty() == null ? 2 : request.getDifficulty());
         entity.setDefaultScore(ScoreUtil.toCent(request.getDefaultScore()));

@@ -246,6 +246,8 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             boolean choice = type == QuestionType.SINGLE || type == QuestionType.MULTIPLE;
             q.setOptionsJson(choice ? toJson(options) : null);
             q.setAnswerJson(toJson(answer));
+            // 与手工新增保持一致：空数取答案数组长度
+            q.setBlankCount(type == QuestionType.BLANK ? Math.max(1, answer.size()) : 1);
             q.setAnalysis(row.getAnalysis());
             q.setDifficulty(parseDifficulty(row.getDifficulty()));
             q.setDefaultScore(parseScore(row.getScore()));
