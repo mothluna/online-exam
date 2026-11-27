@@ -234,7 +234,10 @@ onMounted(loadList)
       </el-table-column>
       <el-table-column label="及格率" min-width="160">
         <template #default="{ row }">
+          <!-- 无人提交时及格率没有意义：0% 会和"全员不及格"混淆 -->
+          <span v-if="!row.submitCount" class="no-data">—</span>
           <el-progress
+            v-else
             :percentage="Number(row.passRate)"
             :stroke-width="10"
             :color="Number(row.passRate) >= 60 ? '#67c23a' : '#e6a23c'"
@@ -279,7 +282,10 @@ onMounted(loadList)
       <el-col :span="6">
         <div class="kpi">
           <div class="kpi-label">提交人数</div>
-          <div class="kpi-value">{{ selected.submitCount }}<span class="kpi-sub">（{{ submitRate }}%）</span></div>
+          <div class="kpi-value">
+            {{ selected.submitCount }}
+            <span class="kpi-sub">（{{ selected.joinCount ? submitRate + '%' : '—' }}）</span>
+          </div>
         </div>
       </el-col>
       <el-col :span="6">
@@ -291,8 +297,11 @@ onMounted(loadList)
       <el-col :span="6">
         <div class="kpi">
           <div class="kpi-label">及格率</div>
-          <div class="kpi-value" :class="{ danger: Number(selected.passRate) < 60 }">
-            {{ Number(selected.passRate).toFixed(1) }}<span class="kpi-sub">%（{{ selected.passCount }} 人）</span>
+          <div class="kpi-value" :class="{ danger: selected.submitCount > 0 && Number(selected.passRate) < 60 }">
+            <template v-if="selected.submitCount">
+              {{ Number(selected.passRate).toFixed(1) }}<span class="kpi-sub">%（{{ selected.passCount }} 人）</span>
+            </template>
+            <span v-else class="kpi-sub">暂无提交</span>
           </div>
         </div>
       </el-col>
@@ -428,6 +437,11 @@ onMounted(loadList)
   font-size: 12px;
   font-weight: 400;
   color: var(--el-text-color-secondary);
+}
+
+/* 无数据占位：与"真实的 0"区分开 */
+.no-data {
+  color: var(--el-text-color-placeholder);
 }
 
 .section-title {
