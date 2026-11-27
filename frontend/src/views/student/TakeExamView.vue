@@ -37,6 +37,13 @@ const dirty = new Set<number>()
 // 已被服务端清洗过的题目只提示一次，避免每次自动暂存都弹窗
 const sanitizedNotified = new Set<number>()
 
+/** 连续失败次数，用于指数退避；成功一次就清零 */
+const saveFailures = ref(0)
+/** 早于这个时刻不重试（退避窗口），避免断网时每 10 秒刷屏 */
+const nextRetryAt = ref(0)
+/** 每秒刷新的时间戳，用来驱动"x 秒后重试"的倒计时 */
+const nowTs = ref(Date.now())
+
 let tickTimer: number | undefined
 let autoSaveTimer: number | undefined
 let debounceTimer: number | undefined
@@ -103,7 +110,11 @@ async function load() {
   }
 }
 
+/** 距下次重试还有多少秒（用于状态条倒计时） */
+const retryIn = computed(() => Math.max(0, Math.ceil((nextRetryAt.value - nowTs.value) / 1000)))
+
 function tick() {
+  nowTs.value = Date.now()
   if (!attempt.value) {
     return
   }
@@ -149,9 +160,13 @@ function markDirty(questionId: number) {
   debounceTimer = window.setTimeout(() => void flush(), 800)
 }
 
-async function flush(): Promise<boolean> {
+async function flush(force = false): Promise<boolean> {
   if (!isRunning.value || dirty.size === 0) {
     return true
+  }
+  // 退避窗口内跳过自动重试；交卷/离开页面这类需要抢救答案的场景用 force 绕过
+  if (!force && Date.now() < nextRetryAt.value) {
+    return false
   }
   const ids = [...dirty]
   dirty.clear()
@@ -174,6 +189,8 @@ async function flush(): Promise<boolean> {
       }
     }
     lastSavedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    saveFailures.value = 0
+    nextRetryAt.value = 0
     return true
   } catch (error) {
     // 失败的题目放回队列，下一轮自动重试；不要静默丢弃用户答案
@@ -184,7 +201,13 @@ async function flush(): Promise<boolean> {
       stopTimers()
       ElMessage.warning('考试已结束，正在为你交卷')
       void submit(true)
+      return false
     }
+    // 连续失败时指数退避：10s → 20s → 40s，封顶 60s。
+    // 断网时每 10 秒重试一次只会刷屏，也让"没保存上"这件事更不显眼。
+    saveFailures.value += 1
+    const backoff = Math.min(10000 * 2 ** (saveFailures.value - 1), 60000)
+    nextRetryAt.value = Date.now() + backoff
     return false
   } finally {
     saving.value = false
@@ -241,7 +264,7 @@ async function submit(auto = false) {
 
   submitting.value = true
   try {
-    await flush()
+    await flush(true)
     const data = await submitAttempt(attemptId)
     result.value = data
     attempt.value.status = data.status
@@ -287,7 +310,11 @@ onBeforeUnmount(() => {
           <el-tag size="small" type="info" effect="plain">{{ attempt.totalCount }} 题 / {{ Number(attempt.totalScore).toFixed(0) }} 分</el-tag>
         </div>
         <div class="right">
-          <span class="saved" v-if="lastSavedAt">已自动保存 {{ lastSavedAt }}</span>
+          <!-- 失败必须显性化：只在控制台/网络面板里是看不见的 -->
+          <span class="saved error" v-if="saveFailures > 0">
+            未保存（连续失败 {{ saveFailures }} 次）<template v-if="retryIn > 0">，{{ retryIn }}s 后重试</template>
+          </span>
+          <span class="saved" v-else-if="lastSavedAt">已自动保存 {{ lastSavedAt }}</span>
           <span class="saved saving" v-else-if="saving">保存中…</span>
           <div class="countdown" :class="{ danger: countdownDanger }">
             <el-icon><Timer /></el-icon>
@@ -475,6 +502,11 @@ onBeforeUnmount(() => {
 
 .saved.saving {
   color: var(--el-color-primary);
+}
+
+.saved.error {
+  color: var(--el-color-danger);
+  font-weight: 500;
 }
 
 .countdown {
