@@ -13,6 +13,11 @@ import UserFormDialog from './components/UserFormDialog.vue'
 import ResetPasswordDialog from './components/ResetPasswordDialog.vue'
 import { useUserStore } from '@/stores/user'
 
+// 表格插槽 row 为宽类型，在边界收窄一次
+function asUser(row: unknown): UserItem {
+  return row as UserItem
+}
+
 const userStore = useUserStore()
 
 const list = ref<UserItem[]>([])
@@ -189,8 +194,8 @@ onMounted(loadList)
             v-model="row.status"
             :active-value="1"
             :inactive-value="0"
-            :disabled="isSelf(row)"
-            @change="toggleStatus(row)"
+            :disabled="isSelf(asUser(row))"
+            @change="toggleStatus(asUser(row))"
           />
         </template>
       </el-table-column>
@@ -200,10 +205,10 @@ onMounted(loadList)
       <el-table-column prop="createdAt" label="创建时间" width="180" />
       <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
-          <el-button text type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button text type="primary" size="small" @click="openResetPassword(row)">重置密码</el-button>
-          <el-button text type="warning" size="small" :disabled="isSelf(row)" @click="kick(row)">强制下线</el-button>
-          <el-button text type="danger" size="small" :disabled="isSelf(row)" @click="remove(row)">删除</el-button>
+          <el-button text type="primary" size="small" @click="openEdit(asUser(row))">编辑</el-button>
+          <el-button text type="primary" size="small" @click="openResetPassword(asUser(row))">重置密码</el-button>
+          <el-button text type="warning" size="small" :disabled="isSelf(asUser(row))" @click="kick(asUser(row))">强制下线</el-button>
+          <el-button text type="danger" size="small" :disabled="isSelf(asUser(row))" @click="remove(asUser(row))">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

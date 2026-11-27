@@ -4,6 +4,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteExam, fetchExams, publishExam, type ExamItem } from '@/api/exam'
 import ExamFormDialog from './components/ExamFormDialog.vue'
 
+// el-table 插槽的 row 是 DefaultRow（Record<PropertyKey, any>），
+// 在边界显式收窄，保证下面的处理函数仍按 ExamItem 严格校验
+function asExam(row: unknown): ExamItem {
+  return row as ExamItem
+}
+
 const list = ref<ExamItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -142,13 +148,13 @@ onMounted(loadList)
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.status === 'DRAFT'" text type="primary" size="small" @click="openEdit(row)">
+          <el-button v-if="row.status === 'DRAFT'" text type="primary" size="small" @click="openEdit(asExam(row))">
             编辑
           </el-button>
-          <el-button v-if="row.status === 'DRAFT'" text type="success" size="small" @click="publish(row)">
+          <el-button v-if="row.status === 'DRAFT'" text type="success" size="small" @click="publish(asExam(row))">
             发布
           </el-button>
-          <el-button v-if="row.status === 'DRAFT'" text type="danger" size="small" @click="remove(row)">
+          <el-button v-if="row.status === 'DRAFT'" text type="danger" size="small" @click="remove(asExam(row))">
             删除
           </el-button>
         </template>

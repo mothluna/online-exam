@@ -13,6 +13,11 @@ import {
 import type { CategoryNode } from '@/api/question'
 import QuestionPickerDialog from './QuestionPickerDialog.vue'
 
+// 表格插槽 row 为宽类型，在边界收窄一次
+function asPaperQuestion(row: unknown): PaperQuestionItem {
+  return row as PaperQuestionItem
+}
+
 const props = defineProps<{
   modelValue: boolean
   paperId: number | null
@@ -239,7 +244,7 @@ async function onQuestionsAdded() {
             </el-table-column>
             <el-table-column v-if="isDraft" label="操作" width="80">
               <template #default="{ row }">
-                <el-button text type="danger" size="small" @click="handleRemove(row)">移除</el-button>
+                <el-button text type="danger" size="small" @click="handleRemove(asPaperQuestion(row))">移除</el-button>
               </template>
             </el-table-column>
             <template #empty>暂无题目</template>

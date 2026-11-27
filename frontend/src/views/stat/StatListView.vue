@@ -15,6 +15,11 @@ import { saveBlob } from '@/utils/download'
 import ScoreDistChart from './components/ScoreDistChart.vue'
 import AttemptReviewDrawer from './components/AttemptReviewDrawer.vue'
 
+// 表格插槽 row 为宽类型，在边界收窄一次
+function asAttemptStat(row: unknown): AttemptStat {
+  return row as AttemptStat
+}
+
 const list = ref<ExamStat[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -320,7 +325,7 @@ onMounted(loadList)
       </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
-          <el-button text type="primary" size="small" @click="openReview(row)">复核</el-button>
+          <el-button text type="primary" size="small" @click="openReview(asAttemptStat(row))">复核</el-button>
         </template>
       </el-table-column>
       <template #empty>暂无数据</template>

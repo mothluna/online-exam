@@ -1,9 +1,28 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import 'element-plus/dist/index.css'
+import { ElLoading } from 'element-plus'
+import {
+  ArrowDown,
+  Calendar,
+  Check,
+  DataAnalysis,
+  Delete,
+  Document,
+  Download,
+  EditPen,
+  Files,
+  HomeFilled,
+  Plus,
+  Reading,
+  Timer,
+  UploadFilled,
+  User,
+} from '@element-plus/icons-vue'
+// 按需引入后需要基础变量；message/message-box/loading 是函数式或指令，需显式引样式
+import 'element-plus/theme-chalk/base.css'
+import 'element-plus/theme-chalk/el-message.css'
+import 'element-plus/theme-chalk/el-message-box.css'
+import 'element-plus/theme-chalk/el-loading.css'
 import './styles/index.css'
 
 import App from './App.vue'
@@ -15,11 +34,29 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
+// v-loading 是指令，不在模板组件解析范围内，需显式注册
+app.use(ElLoading)
 
-// 图标全局注册，模板里可直接用 <component :is="'User'" />
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
+// 只注册实际用到的图标：菜单 icon 是字符串，靠 <component :is="item.icon" /> 运行时解析
+const icons = {
+  ArrowDown,
+  Calendar,
+  Check,
+  DataAnalysis,
+  Delete,
+  Document,
+  Download,
+  EditPen,
+  Files,
+  HomeFilled,
+  Plus,
+  Reading,
+  Timer,
+  UploadFilled,
+  User,
+}
+for (const [name, component] of Object.entries(icons)) {
+  app.component(name, component)
 }
 
 // 401 统一处理：清本地状态并回登录页，request 层不需要认识 router

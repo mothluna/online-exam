@@ -6,6 +6,11 @@ import { fetchCategories, type CategoryNode } from '@/api/question'
 import PaperFormDialog from './components/PaperFormDialog.vue'
 import PaperDetailDrawer from './components/PaperDetailDrawer.vue'
 
+// 同上：表格插槽 row 为宽类型，在边界收窄一次
+function asPaper(row: unknown): PaperItem {
+  return row as PaperItem
+}
+
 const categories = ref<CategoryNode[]>([])
 const list = ref<PaperItem[]>([])
 const total = ref(0)
@@ -155,11 +160,11 @@ onMounted(async () => {
       <el-table-column prop="createdAt" label="创建时间" width="170" />
       <el-table-column label="操作" width="190" fixed="right">
         <template #default="{ row }">
-          <el-button text type="primary" size="small" @click="openDetail(row)">预览</el-button>
-          <el-button v-if="row.status === 'DRAFT'" text type="primary" size="small" @click="openEdit(row)">
+          <el-button text type="primary" size="small" @click="openDetail(asPaper(row))">预览</el-button>
+          <el-button v-if="row.status === 'DRAFT'" text type="primary" size="small" @click="openEdit(asPaper(row))">
             编辑
           </el-button>
-          <el-button v-if="row.status === 'DRAFT'" text type="danger" size="small" @click="remove(row)">
+          <el-button v-if="row.status === 'DRAFT'" text type="danger" size="small" @click="remove(asPaper(row))">
             删除
           </el-button>
         </template>

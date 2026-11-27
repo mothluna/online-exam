@@ -17,6 +17,11 @@ import CategoryDialog from './components/CategoryDialog.vue'
 import QuestionFormDialog from './components/QuestionFormDialog.vue'
 import ImportDialog from './components/ImportDialog.vue'
 
+// el-table 插槽 row 为宽类型，在边界收窄一次，保持处理函数签名严格
+function asQuestion(row: unknown): QuestionItem {
+  return row as QuestionItem
+}
+
 const categories = ref<CategoryNode[]>([])
 const treeLoading = ref(false)
 const selectedCategoryId = ref<number | null>(null)
@@ -318,14 +323,14 @@ onMounted(async () => {
                 v-model="row.status"
                 :active-value="1"
                 :inactive-value="0"
-                @change="toggleStatus(row)"
+                @change="toggleStatus(asQuestion(row))"
               />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button text type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-              <el-button text type="danger" size="small" @click="removeQuestion(row)">删除</el-button>
+              <el-button text type="primary" size="small" @click="openEdit(asQuestion(row))">编辑</el-button>
+              <el-button text type="danger" size="small" @click="removeQuestion(asQuestion(row))">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
