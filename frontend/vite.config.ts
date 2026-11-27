@@ -28,6 +28,16 @@ export default defineConfig({
       },
     },
   },
+  // 预览构建产物时同样需要代理，否则 /api 会打到 4173 自己身上
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     chunkSizeWarningLimit: 1500,
   },
